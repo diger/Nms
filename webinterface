@@ -13,7 +13,7 @@ use Abills::Base qw(in_array mk_unique_value load_pmodule2 date_format _bp);
 use Abills::Filters qw(_mac_former dec2hex);
 require Abills::Misc;
 use Data::Dumper;
-use Nms;
+use Nms::db::Nms;
 use Dv;
 use Equipment;
 
