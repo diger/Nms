@@ -1,0 +1,7 @@
+%FUNCTIONS_LIST = (
+  "1:0:NMS:nms_obj:"          => 8,
+  "2:0:NMS:oid_table_edit:"         => 5,
+  "3:0:MIBS browser:mibs_browser:"  => 8,
+);
+
+1
