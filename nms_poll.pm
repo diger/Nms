@@ -8,11 +8,12 @@ use strict;
 use warnings;
 
 use Abills::Filters;
-use Abills::Base qw(in_array load_pmodule2);
+use Abills::Base qw(in_array load_pmodule2 ip2int);
 use POSIX qw(strftime);
 use Nms::db::Nms;
 use Equipment;
 use Data::Dumper;
+use Net::IP;
 
 our (
   $Admin,
@@ -81,26 +82,28 @@ sub nms_poll {
   $snmpparms{Community} = $SNMP_COMMUNITY;
   $snmpparms{Version} = 2;
   $snmpparms{Retries} = 1;
+  my $vl = new SNMP::VarList(['sysObjectID', 0],
+                             ['sysDescr', 0],
+                             ['sysName', 0],
+                             ['sysLocation', 0],
+                             ['sysUpTime', 0]);
 
-  my $oids = $Nms->oids_list({
-	  PAGE_ROWS => 10000,
-	  OBJECTID  => '_SHOW',
-	  IID       => '_SHOW',
-  });
-  my %oids;
-  foreach my $id ( @$oids ){
-	  $oids{$id->[0]} = $id->[2];
-  } 
-  my $vars = SNMP::VarList->new( @$oids );
-    
   if ($argv->{DISC}) {
 	  my $ip = new Net::IP( $argv->{IPS} || $conf{EQUIP_NET});
 	  do {
 		  $snmpparms{DestHost} = $ip->ip();
 		  $sess = new SNMP::Session(%snmpparms);
 		  print $ip->ip() . "\n" if $debug > 0;
-		  my $sysoid = $sess->get([ 'sysObjectID', 0 ]);
-		  $Nms->obj_add({ IP => ip2int($ip->ip()), SYS_OID => $sysoid }) if $sysoid;
+		  my @result = $sess->get($vl);
+      print Dumper \@result if $debug > 0;
+      $Nms->obj_add({ 
+        IP => ip2int($ip->ip()),
+        SYSOBJECTID => $result[0],
+        SYSDESCR    => $result[1],
+        SYSNAME     => $result[2],
+        SYSLOCATION => $result[3],
+        SYSUPTIME   => $result[4]/100,
+      }) if @result;
 	  } while (++$ip);
   }
   foreach my $obj (@$obj_list) {
@@ -116,6 +119,7 @@ sub nms_poll {
 
     my $stats = $Equipment->graph_list({ COLS_NAME => 1, OBJ_ID => $obj->{id} });
 
+=comm
 	if ($argv->{FIX}) {
 	  $snmpparms{UseSprintValue} = 1;
 	  $snmpparms{UseNumeric} = 1;
@@ -136,7 +140,7 @@ sub nms_poll {
 		  }
 	  }
     }
-	
+=cut	
 	if ($argv->{STATS} && $stats) {
       stats({ NAS_ID => $obj->{nas_id} });
     }

@@ -52,14 +52,14 @@ sub obj_list {
 
   my $SECRETKEY = $CONF->{secretkey} || '';
   my $WHERE =  $self->search_former($attr, [
-      ['IP',            'IP', 'ip', 'INET_NTOA(o.ip) AS ip' ],
-	  ['SYS_OID',      'STR', 'sys_oid',                  1 ],
-	  ['NAS_NAME',     'STR', 'name',                     1 ],
-	  ['SYS_NAME',     'STR', 'sysName',             'sysName.VALUE AS sysName' ],
-	  ['SYS_LOCATION', 'STR', 'sysLocation', 'sysLocation.VALUE AS sysLocation' ],
-	  ['SYS_UPTIME',   'STR', 'sysUpTime',       'sysUpTime.VALUE AS sysUpTime' ],
-	  ['SYS_DESCR',    'STR', 'sysDescr',          'sysDescr.VALUE AS sysDescr' ],
-	  ['ID',           'INT', 'o.id',                     1 ],
+    ['IP',           'IP',  'ip',  'INET_NTOA(o.ip) AS ip' ],
+	  ['SYS_OBJECTID', 'STR', 'sysobjectid',               1 ],
+	  ['NAS_NAME',     'STR', 'name',                      1 ],
+	  ['SYS_NAME',     'STR', 'sysname',                   1 ],
+	  ['SYS_LOCATION', 'STR', 'syslocation',               1 ],
+	  ['SYS_UPTIME',   'STR', 'sysuptime',                 1 ],
+	  ['SYS_DESCR',    'STR', 'sysdescr',                  1 ],
+	  ['ID',           'INT', 'o.id',                      1 ],
 	  ['NAS_ID',       'INT', 'n.id',      'n.id AS nas_id' ],
 	  ['RO_COMMUNITY', 'STR', '', "DECODE(ro_community, '$SECRETKEY') AS ro_community"],
 	  ['RW_COMMUNITY', 'STR', '', "DECODE(rw_community, '$SECRETKEY') AS rw_community"],
@@ -68,18 +68,9 @@ sub obj_list {
     }
   );
   
-  my @LEFT=();
-  if ($attr->{VALUES}){
-	  foreach my $col (sort @{$attr->{VALUES}}){
-	  	#$self->{SEARCH_FIELDS} .= "$col->[0].VALUE AS $col->[0],";
-	  	push @LEFT, "LEFT JOIN nms_obj_values $col->[0] ON $col->[0].obj_id=o.id AND $col->[0].oid_id='$col->[3]'";
-	  }
-  }
-
   $self->query2("SELECT $self->{SEARCH_FIELDS} o.id AS id
     FROM nms_obj o
-	LEFT JOIN nas n ON (n.ip=o.ip)
-	@LEFT
+    LEFT JOIN nas n ON (n.ip=o.ip)
     $WHERE
     ORDER BY $SORT $DESC
     LIMIT $PG, $PAGE_ROWS;",
@@ -106,11 +97,21 @@ sub obj_add {
   my $self = shift;
   my ($attr) = @_;
 
-  $self->query2("INSERT INTO nms_obj (ip, sys_oid) VALUES
-				('$attr->{IP}', '$attr->{SYS_OID}')
-				ON DUPLICATE KEY UPDATE sys_oid='$attr->{SYS_OID}'", 'do'
+  $self->query2("INSERT INTO nms_obj ( ip, sysobjectid, sysname, syslocation, sysuptime, sysdescr ) VALUES
+				('$attr->{IP}',
+         '$attr->{SYSOBJECTID}',
+         '$attr->{SYSNAME}',
+         '$attr->{SYSLOCATION}',
+         '$attr->{SYSUPTIME}',
+         '$attr->{SYSDESCR}')
+				ON DUPLICATE KEY UPDATE sysobjectid='$attr->{SYSOBJECTID}',
+                                sysname='$attr->{SYSNAME}',
+                                syslocation='$attr->{SYSLOCATION}',
+                                sysuptime='$attr->{SYSUPTIME}',
+                                sysdescr='$attr->{SYSDESCR}'
+                                ", 'do'
 				);
-
+        
   return $self;
 }
 
