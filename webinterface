@@ -762,19 +762,23 @@ sub nms_snmp_table {
 sub mibs_browser {
 
   my ($attr) = @_;
-#  $Nms->{debug}=1;
-  $pages_qs = ($attr->{KEY}) ? "&$attr->{KEY}=1" : q{};
+ # $Nms->{debug}=1;
+  $pages_qs = ($attr->{ID}) ? "&ID=$attr->{ID}" : q{};
   my $root_index = get_function_index('mibs_browser');
+  my $ID;
 
-   my $nms = $Nms->obj_list({ 
+  my $nms = $Nms->obj_list({ 
     COLS_NAME => 1,
     IP => '_SHOW',
-    ID => $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE},
+    ID => $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE},
     SYS_OBJECTID => '_SHOW'
   });
-  my @sys = split('\.', $nms->[0]->{sysobjectid});
-  my $vendor = $Nms->vendors_list({ COLS_NAME => 1, ID => $sys[7], NAME => '_SHOW' });
-  SNMP::addMibFiles(glob('../../var/snmp/mibs/private/' . $vendor->[0]->{id} . '/*'));
+  if ($Nms->{TOTAL} == 1){
+    $ID = $nms->[0]->{id} ;
+    my @sys = split('\.', $nms->[0]->{sysobjectid});
+    my $vendor = $Nms->vendors_list({ COLS_NAME => 1, ID => $sys[7], NAME => '_SHOW' });
+    SNMP::addMibFiles(glob('../../var/snmp/mibs/private/' . $vendor->[0]->{id} . '/*')) ;
+  }
 
   if ($FORM{OID}){
     my $table = $html->table({});
@@ -840,12 +844,12 @@ sub mibs_browser {
                   style => 'overflow-y: scroll;height:75vh;outline: 1px solid silver'
                 });
   #my $ID = ($FORM{ID})? $FORM{ID} : 0 ;
-  my $ID = $nms->[0]->{id} ;
   my $scr = qq(
          <link rel='stylesheet' href='/styles/default_adm/css/modules/cablecat/jquery.contextMenu.min.css'>
          <script src='/styles/default_adm/js/modules/cablecat/jquery.contextMenu.min.js'></script>
          <script>
           var id = '$ID';
+
           \$(function(){
             \$.contextMenu({
                     selector: '.tree-item-row', 
@@ -887,7 +891,7 @@ sub mibs_browser {
           };
           \$('.tree-menu').find('.tree-toggler').on('click', function(){ renewLeftBox(this.innerText, 'ID') })
           \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText, 'ID') })
-          \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText,'GET') })
+          \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText,'GET', id) })
         </script>); 
         #\$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.getAttribute('oid'),'GET') })
         #if ( ip == 0 ){
