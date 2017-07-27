@@ -185,12 +185,13 @@ sub oids_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 50;
 
   my $WHERE =  $self->search_former($attr, [
-      ['SECTION',  'STR', 'section',  0 ],
-      ['LABEL',    'STR', 'label',    1 ],
+    ['ID',       'INT', 'id',       1 ],
+    ['SECTION',  'STR', 'section',  1 ],
+    ['LABEL',    'STR', 'label',    1 ],
 	  ['OBJECTID', 'STR', 'objectID', 1 ],
 	  ['IID',      'INT', 'iid',      1 ],
 	  ['TYPE',     'STR', 'type',     1 ],
-	  ['ACCESS',   'INT', 'access',   1 ],
+	  ['ACCESS',   'STR', 'access',   1 ],
     ],
     { WHERE => 1,
     }
@@ -241,7 +242,7 @@ sub oids_rows_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 50;
 
   my $WHERE =  $self->search_former($attr, [
-      ['OID_ID',   'INT', 'oid_id',   1 ],
+    ['OID_ID',   'INT', 'oid_id',   1 ],
 	  ['LABEL',    'STR', 'label',    1 ],
 	  ['OBJECTID', 'STR', 'objectID', 1 ],
 	  ['IID',      'INT', 'iid',      1 ],

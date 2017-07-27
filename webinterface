@@ -564,7 +564,7 @@ sub oid_table_edit {
 
   } 
   elsif ( $FORM{ID} ) {
-    print "ADD";
+    oid_table_row_edit({ OBJ_ID => $FORM{ID} });
   } 
   else {
     result_former({
@@ -588,6 +588,97 @@ sub oid_table_edit {
          qs   => $pages_qs,
         ID   => 'OID_LIST',
       MENU => "$lang{ADD}:index=$index$pages_qs&add=1:add",
+      },
+      MAKE_ROWS => 1,
+      TOTAL     => 1
+    });
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 oid_table_row_edit()
+
+=cut
+
+#**********************************************************
+sub oid_table_row_edit {
+
+  my ($attr) = @_;
+  if ( $FORM{del} ) {
+    $Nms->oid_row_del($FORM{del});
+  }
+  if ( $FORM{GET} ) {
+    return nms_snmp_get({ IP => $FORM{GET}, OID => $FORM{OID}});
+  } 
+  if ( $FORM{add} ) {
+    mibs_browser();
+  } 
+
+  my $oid = $Nms->oids_list({
+    COLS_NAME  => 1,
+    ID         => $FORM{ID},
+    OBJECTID   => '_SHOW',
+    LABEL      => '_SHOW',
+    IID        => '_SHOW',
+    TYPE       => '_SHOW',
+    ACCESS     => '_SHOW'
+  });
+  $oid = $oid->[0];
+
+	print $html->form_main(
+  {
+    CONTENT =>  label_w_text({ NAME => $lang{NAME}, TEXT => $oid->{label}, CTRL=> 1 }).
+        				label_w_text({ NAME => 'OBJECT_ID', TEXT => $oid->{objectID}, CTRL=> 1 }).
+                label_w_text({ NAME => $lang{TYPE}, TEXT => $html->form_select('TYPE',
+                {
+                  SELECTED  => $oid->{type},
+                  SEL_ARRAY => ["", "table"],
+                  NO_ID     => 1,
+                }), CTRL=> 1 }).
+                label_w_text({ NAME => $lang{ACCESS}, TEXT => $html->form_select('ACCESS',
+                {
+                  SELECTED  => $oid->{access},
+                  SEL_ARRAY => ["", "ReadOnly", "ReadWrite", "WriteOnly", "NoAccess", "Notify", "Create"],
+                  NO_ID     => 1,
+                }), CTRL=> 1 }).
+                label_w_text({ RCOL => 3,
+    					               TEXT => $html->form_input( 'SAVE', ( $FORM{chg} )? $lang{CHANGE} : $lang{CREATE}, { TYPE => 'SUBMIT' } ) . "	".
+    											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"})
+    								  }),
+    METHOD  => 'GET',
+    HIDDEN  => {
+      'index' => $index,
+      'ID'    => $FORM{chg},
+    },
+  } );
+
+  
+  if ( $FORM{TYPE} ) {
+    $LIST_PARAMS{OID_ID}=$attr->{ID} || $FORM{ID} || '' ;
+    result_former({
+      INPUT_DATA      => $Nms,
+      FUNCTION        => 'oids_rows_list',
+      DEFAULT_FIELDS  => 'LABEL,OBJECTID,IID,ACCESS',
+      FUNCTION_FIELDS => 'oid_table_row_edit:change:id,del',
+      HIDDEN_FIELDS   => 'OID_ID',
+      EXT_TITLES      => {
+        ip       => 'IP',
+        access   => $lang{ACCESS},
+      },
+      SKIP_USER_TITLE => 1,
+      FILTER_COLS  => {
+       #   ip   => "search_link:nms_obj:,ID",
+       #   name => "search_link:form_nas:,NAS_ID"
+       },
+        #SELECT_VALUE    => { sysObjectID => \%ohash
+        #           },
+      TABLE           => {
+        qs   => $pages_qs,
+        ID   => 'OID_ROWS_LIST',
+        MENU => "$lang{ADD}:index=$index$pages_qs&add=1:add",
       },
       MAKE_ROWS => 1,
       TOTAL     => 1
@@ -1028,6 +1119,32 @@ sub sec2time_str {
   my($value) = @_;
 
   return sec2time($value, { str => 1 });
+}
+
+#**********************************************************
+=head2 label_w_text($attr); - return formated text with label
+
+  Arguments:
+    NAME - text of label
+    TEXT 
+    CTRL - for form with input control
+    COLOR - color of label
+    LCOL
+    RCOL
+      
+  Returns:
+    String with element
+
+=cut
+#**********************************************************
+sub label_w_text {
+	my ($attr) = @_;
+	my @lable;
+	push @lable, 'control-label' if (!$attr->{CTRL}) ;
+	push @lable, "label-$attr->{COLOR}" if ($attr->{COLOR}) ;
+	
+	return "<div class='form-group'><label class='@lable col-sm-" . ($attr->{LCOL}||'2') . "'>".
+				($attr->{NAME}||'') . "</label><div class='col-sm-" . ($attr->{RCOL}||'2') . "'>" . ($attr->{TEXT} || '') . "</div></div>";
 }
 
 1;
