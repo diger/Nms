@@ -1,7 +1,11 @@
 %FUNCTIONS_LIST = (
-  "1:0:NMS:nms_obj:"          => 8,
-  "2:0:NMS:oid_table_edit:"         => 5,
-  "3:0:MIBS browser:mibs_browser:"  => 8,
+  "1:0:NMS:sysobjectid_table:"              => 5,
+  "2:1:OIDS:oid_table_edit:OBJECTID"        => 5,
+  "3:1:SNMP Modules:modules_table:OBJECTID" => 5,
+  "4:1:Cable Test:cable_test_setup:"        => 5,
+  "5:0:NMS:nms_obj:"                        => 8,
+  "6:0:MIBS browser:mibs_browser:"          => 8,
+  "7:0:Cable test:cable_test:UID"           => 20,
 );
 
 1

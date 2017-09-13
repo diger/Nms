@@ -53,14 +53,14 @@ sub obj_list {
   my $SECRETKEY = $CONF->{secretkey} || '';
   my $WHERE =  $self->search_former($attr, [
     ['IP',           'IP',  'ip',  'INET_NTOA(o.ip) AS ip' ],
-	  ['SYS_OBJECTID', 'STR', 'sysobjectid',               1 ],
 	  ['NAS_NAME',     'STR', 'name',                      1 ],
 	  ['SYS_NAME',     'STR', 'sysname',                   1 ],
 	  ['SYS_LOCATION', 'STR', 'syslocation',               1 ],
+    ['SYS_OBJECTID', 'STR', 'sysobjectid',               1 ],
 	  ['SYS_UPTIME',   'STR', 'sysuptime',                 1 ],
 	  ['SYS_DESCR',    'STR', 'sysdescr',                  1 ],
 	  ['ID',           'INT', 'o.id',                      1 ],
-	  ['NAS_ID',       'INT', 'n.id',      'n.id AS nas_id' ],
+	  ['NAS_ID',       'INT', 'n.id',       'n.id AS nas_id' ],
 	  ['RO_COMMUNITY', 'STR', '', "DECODE(ro_community, '$SECRETKEY') AS ro_community"],
 	  ['RW_COMMUNITY', 'STR', '', "DECODE(rw_community, '$SECRETKEY') AS rw_community"],
     ],
@@ -183,12 +183,13 @@ sub oids_list {
   $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : '';
   $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 50;
+  my $GROUP  = ($attr->{GROUP})     ? "GROUP BY $attr->{GROUP}" : '';
 
   my $WHERE =  $self->search_former($attr, [
     ['ID',       'INT', 'id',       1 ],
     ['SECTION',  'STR', 'section',  1 ],
     ['LABEL',    'STR', 'label',    1 ],
-	  ['OBJECTID', 'STR', 'objectID', 1 ],
+	  ['OBJECTID', 'STR', 'objectid', 1 ],
 	  ['IID',      'INT', 'iid',      1 ],
 	  ['TYPE',     'STR', 'type',     1 ],
 	  ['ACCESS',   'STR', 'access',   1 ],
@@ -200,6 +201,7 @@ sub oids_list {
   $self->query2("SELECT $self->{SEARCH_FIELDS} id
     FROM nms_oids
     $WHERE
+    $GROUP
     ORDER BY $SORT $DESC
     LIMIT $PG, $PAGE_ROWS;",
     undef,
@@ -212,7 +214,37 @@ sub oids_list {
 
   return $list;
 }
-
+#**********************************************************
+# obj_oids_add()
+#**********************************************************
+sub obj_oids_add {
+  my $self = shift;
+  my ($attr) = @_;
+=comm
+  my $UPD =  $self->search_former($attr,
+    [
+      ['ID',       'INT', 'id',       1 ],
+      ['SECTION',  'STR', 'section',  1 ],
+      ['LABEL',    'STR', 'label',    1 ],
+  	  ['OBJECTID', 'STR', 'objectID', 1 ],
+  	  ['IID',      'INT', 'iid',      1 ],
+  	  ['TYPE',     'STR', 'type',     1 ],
+  	  ['ACCESS',   'STR', 'access',   1 ],
+    ]
+  );
+  
+  $self->query2("INSERT INTO nms_oids ( $self->{SEARCH_FIELDS} ) VALUES
+				( $self->{SEARCH_VALUES} )
+				ON DUPLICATE KEY UPDATE $UPD;", 'do'
+				);
+=cut
+  $self->query_add( 'nms_oids', $attr,
+    {
+      REPLACE => 1
+    } );
+        
+  return $self;
+}
 #**********************************************************
 =head2 oid_del($id)
 
@@ -269,6 +301,32 @@ sub oids_rows_list {
 }
 
 #**********************************************************
+# oid_row_add()
+#**********************************************************
+sub oid_row_add {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query_add('nms_oids_rows', $attr);
+
+  return $self;
+}
+
+#**********************************************************
+=head2 oid_row_del($id)
+
+=cut
+#**********************************************************
+sub oid_row_del {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query2("DELETE FROM nms_oids_rows WHERE label='$attr->{LABEL}' AND oid_id=$attr->{OID_ID};", 'do');
+ 
+  return $self;
+}
+
+#**********************************************************
 # vendor_add()
 #**********************************************************
 sub vendor_add {
@@ -320,5 +378,142 @@ sub vendors_list {
 
   return $list;
 }
+
+#**********************************************************
+=head2 sysobjectid_list($attr)
+
+=cut
+#**********************************************************
+sub sysobjectid_list {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
+  $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : '';
+  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
+  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 25;
+  my $GROUP  = ($attr->{GROUP})     ? "GROUP BY $attr->{GROUP}" : '';
+
+  my $WHERE =  $self->search_former($attr, [
+    ['LABEL',    'STR', 'label',    1 ],
+    ['OBJECTID', 'STR', 'objectid', 1 ],
+    ],
+    { WHERE => 1,
+    }
+  );
+
+  $self->query2("SELECT $self->{SEARCH_FIELDS} objectid
+    FROM nms_sysobjectid
+    $WHERE
+    $GROUP
+    ORDER BY $SORT $DESC
+    LIMIT $PG, $PAGE_ROWS;",
+    undef,
+    $attr
+  );
+
+  my $list = $self->{list};
+  
+  return $self->{list_hash} if ($attr->{LIST2HASH});
+
+  return $list;
+}
+
+#**********************************************************
+# sysobjectid_add()
+#**********************************************************
+#sub sysobjectid_add {
+#  my $self = shift;
+#  my ($attr) = @_;
+
+#  $self->query2("INSERT INTO nms_sysobjectid (sysobjectid, sysorid, sysordescr, module) VALUES
+#				('$attr->{SYSOBJECTID}', '$attr->{SYSORID}', '$attr->{SYSORDESCR}', '$attr->{MODULE}')
+#				ON DUPLICATE KEY UPDATE module='$attr->{MODULE}', sysordescr='$attr->{SYSORDESCR}'", 'do'
+#				);
+
+#  return $self;
+#}
+
+sub sysobjectid_add {
+  my $self = shift;
+  my ($attr) = @_;
+  
+  $self->query_add('nms_sysobjectid', $attr, { REPLACE => 1 });
+  return $self;
+}
+
+#**********************************************************
+=head2 sysobjectid_list($attr)
+
+=cut
+#**********************************************************
+sub modules_list {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
+  $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : 'DESC';
+  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
+  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 10000;
+
+  my $WHERE =  $self->search_former($attr, [
+    ['MODULE',   'STR', 'module',   1 ],
+    ['DESCR',    'STR', 'descr',    1 ],
+    ['STATUS',   'INT', 'status',   1 ],
+    ['OBJECTID', 'STR', 'objectid', 1 ],
+    ['ID',       'INT', 'id',       1 ],
+    ],
+    { WHERE => 1,
+    }
+  );
+
+  $self->query2("SELECT $self->{SEARCH_FIELDS} id
+    FROM nms_modules
+    $WHERE
+    ORDER BY $SORT $DESC
+    LIMIT $PG, $PAGE_ROWS;",
+    undef,
+    $attr
+  );
+
+  my $list = $self->{list};
+  $self->query2("SELECT COUNT(*) AS total
+    FROM nms_modules
+    $WHERE;",
+    undef,
+    { INFO => 1 }
+  );  
+  return $self->{list_hash} if ($attr->{LIST2HASH});
+
+  return $list;
+}
+
+#**********************************************************
+# oid_row_add()
+#**********************************************************
+sub module_add {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query_add('nms_modules', $attr, { REPLACE => 1 });
+
+  return $self;
+}
+
+#**********************************************************
+=head2 oid_row_del($id)
+
+=cut
+#**********************************************************
+sub module_del {
+  my $self = shift;
+  my ($id) = @_;
+
+  $self->query_del('nms_modules', { ID => $id });
+ 
+  return $self;
+}
+
+
 
 1
