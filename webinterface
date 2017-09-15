@@ -533,7 +533,11 @@ sub oid_table_edit {
   }
   SNMP::loadModules(@mods);
   if ($FORM{OID}){
-    print nms_show({ OID => $FORM{OID}});
+    print nms_show({
+      OID => $FORM{OID},
+      BTN_NAME => $lang{ADD},
+      BTN_EXT => qq/onclick=addLink()/
+    });
     return 1;
   }
   if ( $FORM{add} && $FORM{add} eq '1') {
@@ -550,7 +554,11 @@ sub oid_table_edit {
                  });
   
     my $OBJECTID = $FORM{OBJECTID};
+    my $OID = $FORM{OID} || '';
     my $scr = qq(<script>
+            function addLink(oid,type){
+              \$.get('index.cgi?qindex=$index&header=2&OBJECTID=$OBJECTID&add=' + oid + '&TYPE=' + type);
+            };
             function renewLeftBox(itemName){
  
              var url = 'index.cgi?qindex=$index&header=2&add=1&OBJECTID=$OBJECTID&OID=' + itemName;
@@ -792,9 +800,7 @@ sub nms_snmp_set {
 sub nms_snmp_table {
 
   my ($attr) = @_;
- # if ($attr->{SECT}){
-    $snmpparms{UseSprintValue} = 1;
- #  }
+  $snmpparms{UseSprintValue} = 1;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{EQUIPMENT_SNMP_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
 
@@ -865,10 +871,22 @@ sub nms_show {
       if $SNMP::MIB{$attr->{OID}}{ranges}[0];
   $table->addrow($html->b($lang{DESCRIBE}), $SNMP::MIB{$attr->{OID}}{TCDescription}) if $SNMP::MIB{$attr->{OID}}{TCDescription};
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
-  my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? "&TYPE=table" : '';
-  $table->addrow($html->button($lang{ADD}, "index=$index&add=$FORM{OID}&OBJECTID=$FORM{OBJECTID}$type",
-          { class =>"btn btn-default" }), '') if $FORM{add};
+  $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
+  if ($attr->{BTN_NAME}){
+    my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : '';
+    my $button = $html->button( $attr->{BTN_NAME}, undef, {
+      JAVASCRIPT     => '',
+      SKIP_HREF      => 1,
+      NO_LINK_FORMER => 1,
+      class          => "btn btn-default",
+      # ICON           => 'glyphicon glyphicon-download',
+      title          => $attr->{BTN_NAME},
+      ex_params      => qq/onclick=addLink('$attr->{OID}','$type') /
+    });
+  
+    $table->addrow($button, '') if $attr->{BTN_NAME};
+  }
    
   return $table->show();
 }
@@ -891,7 +909,7 @@ sub mibs_browser {
   my $nms = $Nms->obj_list({ 
     COLS_NAME => 1,
     IP => '_SHOW',
-    ID => $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE},
+    ID => $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW},
     SYS_OBJECTID => '_SHOW'
   });
   if ($Nms->{TOTAL} == 1){
@@ -1002,12 +1020,11 @@ sub mibs_browser {
           });
           function renewLeftBox(itemName,Action,id,iid){
           iid = iid ? iid : 0 ;
-          
-          var url = 'index.cgi?qindex=$root_index&header=2&' + Action + '=' + id + '&OID=' + itemName + '&IID=' + iid;
+          var url = 'index.cgi?qindex=$root_index&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
             \$('#RESULT').load(url);
           };
-          \$('.tree-menu').find('.tree-toggler').on('click', function(){ renewLeftBox(this.innerText, 'ID') })
-          \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText, 'ID') })
+          \$('.tree-menu').find('.tree-toggler').on('click', function(){ renewLeftBox(this.innerText,'SHOW', id) })
+          \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText,'SHOW', id) })
           \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText,'GET', id) })
         </script>); 
         #\$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.getAttribute('oid'),'GET') })
