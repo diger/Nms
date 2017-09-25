@@ -232,11 +232,9 @@ sub equipment_snmp_stats {
 sub nms_obj {
   
   my ($attr) = @_;
-  
   $pages_qs .= ($FORM{ID}) ? "&ID=$FORM{ID}" : q{};
   $LIST_PARAMS{SORT} = $FORM{sort} || 1;
-  $LIST_PARAMS{TOTAL} = 1;
-  
+  my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
   my $nms = $Nms->obj_list({
       IP           => '_SHOW',
       NAS_NAME     => '_SHOW',
@@ -245,31 +243,22 @@ sub nms_obj {
       SYS_OBJECTID => '_SHOW',
       NAS_ID       => '_SHOW',
       ID           => $FORM{ID} || '_SHOW',
-      COLS_NAME => 1,
+      PAGE_ROWS    => 1000000,
+      COLS_NAME    => 1,
       %LIST_PARAMS,
     });
   if (!$FORM{ID}){
-    my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
-    my @headers = ("$lang{ALL}:index=$index");
-    if ( $Nms->obj_values_list({ OID_ID => 9 }) ) {
-      push @headers, "Switch:index=$index&class=9";
-    }
-    my $btns = $html->table_header( \@headers, { TABS => 1 } );
- 
-    print $html->element('div', $btns, { class => 'navbar navbar-default' });
-
     result_former({
       INPUT_DATA      => $Nms,
       LIST            => $nms,
-      BASE_FIELDS     => 4,
- #     DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID',
-      HIDDEN_FIELDS   => 'NAS_ID',
+      BASE_FIELDS     => 1,
+      DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID',
+      HIDDEN_FIELDS   => 'NAS_ID,ID',
 #     FUNCTION_FIELDS => 'equipment_traps:change:trap_id;&pg='.($FORM{pg}||''),
       EXT_TITLES      => {
         ip       => 'IP',
         name     => "$lang{NAME} NAS",
       },
-      SKIP_USER_TITLE => 1,
       FILTER_COLS  => {
         ip          => "search_link:nms_obj:,ID",
         name        => "search_link:equipment_info:,NAS_ID",
@@ -281,9 +270,32 @@ sub nms_obj {
         qs      => $pages_qs,
         ID      => 'OBJ_LIST',
       },
-      MAKE_ROWS => 1,
-      TOTAL     => 1
+      MAKE_ROWS       => 1,
+      SKIP_USER_TITLE => 1,
+      SKIP_PAGES      => 1,
+      TOTAL           => 1
     });
+    print '<script>$(function () {
+    var table = $("#OBJ_LIST_")
+      .DataTable({
+        "language": {
+          paginate: {
+              first:    "«",
+              previous: "‹",
+              next:     "›",
+              last:     "»",
+          },
+          "zeroRecords":    "'.$lang{NOT_EXIST}.'",
+          "lengthMenu":     "'.$lang{SHOW}.' _MENU_",
+          "search":         "'.$lang{SEARCH}.':",
+          "info":           "'.$lang{SHOWING}.' _START_ - _END_ '.$lang{OF}.' _TOTAL_ ",
+          "infoEmpty":      "'.$lang{SHOWING}.' 0",
+          "infoFiltered":   "('.$lang{TOTAL}.' _MAX_)",
+      },
+      "ordering": false,
+      "lengthMenu": [[25, 50, -1], [25, 50, "'.$lang{ALL}.'"]]
+      });
+    });</script>';
 
  
   } 
@@ -458,7 +470,7 @@ sub oid_table {
   my @panel;
 
   foreach my $t (@$tbl) {
-    my $rows = $Nms->oids_rows_list({ OID_ID => $t->{id} });
+    my $rows = $Nms->oids_rows_list({ ID => $t->{id} });
     my @vars;
     foreach my $row (@$rows) {
       push @vars, $row->[1]
@@ -625,12 +637,12 @@ sub oid_table_row_edit {
   if ( $FORM{OID_DEL} ) {
     $Nms->oid_row_del({ 
       LABEL  => $FORM{OID_DEL},
-      OID_ID => $FORM{ID}
+      ID => $FORM{ID}
     });
   }
   if ( $FORM{ADD} ) {
     $Nms->oid_row_add({
-      OID_ID => $FORM{ID},
+      ID => $FORM{ID},
       LABEL  => $FORM{ADD},
     });
   } 
@@ -649,7 +661,7 @@ sub oid_table_row_edit {
 
   my $rows = $Nms->oids_rows_list({
     COLS_NAME  => 0,
-    OID_ID     => $attr->{OID_ID} || $FORM{ID},
+    ID     => $attr->{OID_ID} || $FORM{ID},
     LABEL      => '_SHOW',
     OBJECTID   => '_SHOW',
     LIST2HASH  => 'label, objectid'
@@ -974,64 +986,25 @@ sub mibs_browser {
                 style => 'overflow-y:scroll;overflow-x:scroll;height:75vh;outline: 1px solid silver'
               });
 
-  my $tree = $html->element('div', mibs_tree(),
+  my $tree = $html->element('div', mibs_tree2(),
                   { 
-                  class => 'col-md-3 text-right',
+                  class => 'col-md-3',
                   style => 'overflow-y: scroll;height:75vh;outline: 1px solid silver'
                 });
   my $scr = qq(
-         <link rel='stylesheet' href='/styles/default_adm/css/modules/cablecat/jquery.contextMenu.min.css'>
-         <script src='/styles/default_adm/js/modules/cablecat/jquery.contextMenu.min.js'></script>
          <script>
           var id = '$ID';
 
-          \$(function(){
-            \$.contextMenu({
-                    selector: '.tree-item-row', 
-                    //autoHide: true,
-                build: function(\$trigger, e) {
-                    var oid = \$trigger.html();
-                  return {
-                            callback: function(key, options) {
-                      renewLeftBox(oid,key,id);
-                            },
-                            items: {
-                                WALK: {name: "Walk", icon: "fa-list"}
-                            }
-                        };
-                    }
-                });
-            \$.contextMenu({
-                    selector: '.tree-item-table', 
-                    autoHide: true,
-                build: function(\$trigger, e) {
-                    var oid = \$trigger.html();
-                  return {
-                            callback: function(key, options) {
-                      renewLeftBox(oid,key,id);
-                            },
-                            items: {
-                                WALK: {name: "Walk", icon: "fa-list"},
-                                TABLE: {name: "Table View", icon: "fa-th-list"},
-                            }
-                        };
-                    }
-                });
-          });
           function renewLeftBox(itemName,Action,id,iid){
           iid = iid ? iid : 0 ;
           var url = 'index.cgi?qindex=$root_index&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
             \$('#RESULT').load(url);
           };
-          \$('.tree-menu').find('.tree-toggler').on('click', function(){ renewLeftBox(this.innerText,'SHOW', id) })
-          \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText,'SHOW', id) })
-          \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText,'GET', id) })
+          \$('#MY_TREE').on("changed.jstree", function (e, data) {
+              renewLeftBox(data.selected,'SHOW', id)
+          });
         </script>); 
-        #\$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.getAttribute('oid'),'GET') })
-        #if ( ip == 0 ){
-        #  ip = \$('.chosen-single').text();
-        #  ip = ip.substring(0, ip.indexOf(' :'));
-        #}
+
   print $tree.$res.$scr;
   return 1;
 }
@@ -1051,17 +1024,16 @@ sub mibs_tree {
   my %labels;
   my @tree_arr;
   foreach my $oid (keys(%SNMP::MIB)) {
-    if ( $SNMP::MIB{$oid}{objectID} =~ /.1.3.6.1./ ) {
       if ( $attr->{LABEL} ) {
         $labels{$SNMP::MIB{$oid}{label}} = $SNMP::MIB{$oid}{objectID} if  $SNMP::MIB{$oid}{label} =~ /$attr->{LABEL}/
       }
       else {
-        my $prev_id = ( split(/\./,$SNMP::MIB{$oid}{objectID}) == 7 )? '0' : $SNMP::MIB{$oid}{parent}{objectID};
+        my $prev_id = ($SNMP::MIB{$oid}{parent})? $SNMP::MIB{$oid}{parent}{objectID} : 0 ;
         my $name = $SNMP::MIB{$oid}{label};
         if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] || ( $SNMP::MIB{$oid}{indexes}[0] && !$attr->{ONLY_TBL} ) ){
           $name = "<p class='tree-item-table'>$SNMP::MIB{$oid}{label}</p>";
         } 
-        elsif ( $SNMP::MIB{$oid}{parent}{indexes}[0]){
+        elsif ( $SNMP::MIB{$oid}{parent} && $SNMP::MIB{$oid}{parent}{indexes}[0]){
           $name = "<p class='tree-item-row'>$SNMP::MIB{$oid}{label}</p>";
         } 
         elsif ( $SNMP::MIB{$oid}{type}){
@@ -1073,7 +1045,6 @@ sub mibs_tree {
           VALUE => $SNMP::MIB{$oid}{objectID},
           PARENT_ID => $prev_id
         });
-      }
     }
   }
 
@@ -1371,6 +1342,157 @@ sub oid_enums {
   };
 
   return %enums;
+}
+
+#**********************************************************
+
+=head2 mibs_tree2()
+
+=cut
+
+#**********************************************************
+sub mibs_tree2 {
+
+  my ($attr) = @_;
+
+ # SNMP::loadModules(@{$attr->{MODULES}});
+  my %labels;
+  my @tree_arr=[];
+  foreach my $oid (sort keys(%SNMP::MIB)) {
+    my $prev_id = ($SNMP::MIB{$oid}{parent})? $SNMP::MIB{$oid}{parent}{objectID} : '#' ;
+    my $icon = '';
+    my %type = ();
+    if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] || ( $SNMP::MIB{$oid}{indexes}[0] && !$attr->{ONLY_TBL} ) ){
+      $type{type} = 'table';
+    } 
+    elsif ( $SNMP::MIB{$oid}{parent} && $SNMP::MIB{$oid}{parent}{indexes}[0]){
+      $type{type} = 'row';
+    } 
+    elsif ( $SNMP::MIB{$oid}{type}){
+      $type{type} = 'scalar';
+    }
+    push @tree_arr, ({
+      id   => $SNMP::MIB{$oid}{objectID},
+      text => $SNMP::MIB{$oid}{label},
+      parent => $prev_id,
+      %type
+    });
+  }
+  return \%labels if $attr->{LABEL};
+  return make_tree( @tree_arr );
+}
+
+#**********************************************************
+=head2 make_tree($attr) - Make different charts
+
+   If given only one series and X_TEXT as YYYY-MM, will build columned compare chart
+
+   Arguments:
+     $attr
+       DATA    - Data array of hashes
+   Result:
+     TRUE or FALSE
+
+=cut
+#**********************************************************
+sub make_tree {
+  my $self = shift;
+  my (@data) = @_;
+  my $result = '';
+
+  my $TREE_ID = 'MY_TREE';
+  my $DATA  = JSON->new->encode(\@data);
+  $result.= qq{
+    <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
+    <script type='text/javascript' src='/styles/lte_adm/plugins/jstree/jstree.min.js'></script>
+    <div><input class='search-input form-control'></input></div>
+    <div id=$TREE_ID></div>
+  };
+  $result.= qq(
+    <script>
+      \$(".search-input").keypress(function(e) {
+        if (e.which == 13) {
+          var searchString = \$(this).val();
+          console.log(searchString);
+          \$('#$TREE_ID').jstree('search', searchString);
+        }
+      });
+      \$('#$TREE_ID').jstree({
+    		'core' : {
+          'themes': {
+            'name': 'proton',
+            'responsive': true
+          },
+          'data' : $DATA
+        },
+        'plugins' : [ 'contextmenu', 'types', 'search' ],
+        'search': {
+          'case_insensitive': true,
+          'show_only_matches' : false
+        },
+        'contextmenu' : {
+          'items' : customMenu
+        },
+        'types' : {
+          'table' : {
+                'icon' : 'glyphicon glyphicon-list-alt'
+              },
+          'row' : {
+                'icon' : 'glyphicon glyphicon-option-horizontal'
+              },
+          'scalar' : {
+                'icon' : 'glyphicon glyphicon-file'
+              }
+        }
+    	});
+      function customMenu(node) {
+          var items = {
+              Get: {
+                  label: 'Get',
+                  icon : 'glyphicon glyphicon-download',
+                  action: function () {
+                    renewLeftBox(node.text,'GET',id);
+                  }
+              },
+              Table: { 
+                  label: 'Table',
+                  icon : 'glyphicon glyphicon-list-alt',
+                  action: function () {
+                    renewLeftBox(node.text,'TABLE',id);
+                  }
+              },
+              Walk: { 
+                  label: 'Walk',
+                  icon : 'glyphicon glyphicon-circle-arrow-down',
+                  action: function () {
+                    renewLeftBox(node.text,'WALK',id);
+                  }
+              }
+          };
+
+          if (node.type === 'scalar') {
+            delete items.Table;
+            delete items.Walk;            
+          }
+          else if (node.type === 'row') {
+            delete items.Get;
+            delete items.Table;
+          }
+          else if (node.type === 'table') {
+            delete items.Get;
+          }
+          else {
+            delete items.Table;
+            delete items.Walk;
+            delete items.Get;
+          }
+
+          return items;
+      }
+	  </script>
+   );
+
+  return $result;
 }
 
 1;

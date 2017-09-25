@@ -47,8 +47,8 @@ sub obj_list {
 
   $SORT      = ($attr->{SORT} && $attr->{SORT} == 1) ? 'LPAD( o.ip, 16, 0 )' : $attr->{SORT}|| 1;
   $DESC      = ($attr->{DESC})      ? $attr->{DESC}        : '';
-  $PG        = ($attr->{PG})        ? $attr->{PG}          : 0;
-  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS}   : 50;
+#  $PG        = ($attr->{PG})        ? $attr->{PG}          : 0;
+#  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS}   : 25;
 
   my $SECRETKEY = $CONF->{secretkey} || '';
   my $WHERE =  $self->search_former($attr, [
@@ -57,8 +57,6 @@ sub obj_list {
 	  ['SYS_NAME',     'STR', 'sysname',                   1 ],
 	  ['SYS_LOCATION', 'STR', 'syslocation',               1 ],
     ['SYS_OBJECTID', 'STR', 'sysobjectid',               1 ],
-	  ['SYS_UPTIME',   'STR', 'sysuptime',                 1 ],
-	  ['SYS_DESCR',    'STR', 'sysdescr',                  1 ],
 	  ['ID',           'INT', 'o.id',                      1 ],
 	  ['NAS_ID',       'INT', 'n.id',       'n.id AS nas_id' ],
 	  ['RO_COMMUNITY', 'STR', '', "DECODE(ro_community, '$SECRETKEY') AS ro_community"],
@@ -72,8 +70,7 @@ sub obj_list {
     FROM nms_obj o
     LEFT JOIN nas n ON (n.ip=o.ip)
     $WHERE
-    ORDER BY $SORT $DESC
-    LIMIT $PG, $PAGE_ROWS;",
+    ORDER BY $SORT $DESC;",
     undef,
     $attr
   );
@@ -97,18 +94,14 @@ sub obj_add {
   my $self = shift;
   my ($attr) = @_;
 
-  $self->query2("INSERT INTO nms_obj ( ip, sysobjectid, sysname, syslocation, sysuptime, sysdescr ) VALUES
+  $self->query2("INSERT INTO nms_obj ( ip, sysobjectid, sysname, syslocation ) VALUES
 				('$attr->{IP}',
          '$attr->{SYSOBJECTID}',
          '$attr->{SYSNAME}',
-         '$attr->{SYSLOCATION}',
-         '$attr->{SYSUPTIME}',
-         '$attr->{SYSDESCR}')
+         '$attr->{SYSLOCATION}')
 				ON DUPLICATE KEY UPDATE sysobjectid='$attr->{SYSOBJECTID}',
                                 sysname='$attr->{SYSNAME}',
-                                syslocation='$attr->{SYSLOCATION}',
-                                sysuptime='$attr->{SYSUPTIME}',
-                                sysdescr='$attr->{SYSDESCR}'
+                                syslocation='$attr->{SYSLOCATION}'
                                 ", 'do'
 				);
         
@@ -274,7 +267,7 @@ sub oids_rows_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 50;
 
   my $WHERE =  $self->search_former($attr, [
-    ['OID_ID',   'INT', 'oid_id',   1 ],
+    ['ID',   'INT', 'id',   1 ],
 	  ['LABEL',    'STR', 'label',    1 ],
 	  ['OBJECTID', 'STR', 'objectID', 1 ],
 	  ['IID',      'INT', 'iid',      1 ],
@@ -321,7 +314,7 @@ sub oid_row_del {
   my $self = shift;
   my ($attr) = @_;
 
-  $self->query2("DELETE FROM nms_oids_rows WHERE label='$attr->{LABEL}' AND oid_id=$attr->{OID_ID};", 'do');
+  $self->query2("DELETE FROM nms_oids_rows WHERE label='$attr->{LABEL}' AND id=$attr->{OID_ID};", 'do');
  
   return $self;
 }
@@ -390,8 +383,6 @@ sub sysobjectid_list {
 
   $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
   $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : '';
-  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
-  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 25;
   my $GROUP  = ($attr->{GROUP})     ? "GROUP BY $attr->{GROUP}" : '';
 
   my $WHERE =  $self->search_former($attr, [
@@ -406,8 +397,7 @@ sub sysobjectid_list {
     FROM nms_sysobjectid
     $WHERE
     $GROUP
-    ORDER BY $SORT $DESC
-    LIMIT $PG, $PAGE_ROWS;",
+    ORDER BY $SORT $DESC;",
     undef,
     $attr
   );
