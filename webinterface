@@ -580,7 +580,7 @@ sub oid_table_edit {
             \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText) })
             \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText) })
           </script>); 
-    print $tree.$scr.$res;
+    print mibs_browser({EDIT => 1});
     return 1;
   }
   elsif ( $FORM{add} ) {
@@ -757,6 +757,7 @@ sub nms_snmp_get {
 sub nms_snmp_walk {
 
   my ($attr) = @_;
+#  $snmpparms{Timeout} = 10000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{EQUIPMENT_SNMP_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $FORM{IP} || $attr->{IP}, %snmpparms);
   my $oid = $FORM{OID} || $attr->{OID};
@@ -813,6 +814,7 @@ sub nms_snmp_table {
 
   my ($attr) = @_;
   $snmpparms{UseSprintValue} = 1;
+#  $snmpparms{Timeout} = 10000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{EQUIPMENT_SNMP_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
 
@@ -885,19 +887,18 @@ sub nms_show {
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
-  if ($attr->{BTN_NAME}){
+  if ($attr->{EDIT}){
     my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : '';
-    my $button = $html->button( $attr->{BTN_NAME}, undef, {
+    my $button = $html->button( $lang{ADD}, undef, {
       JAVASCRIPT     => '',
       SKIP_HREF      => 1,
       NO_LINK_FORMER => 1,
       class          => "btn btn-default",
       # ICON           => 'glyphicon glyphicon-download',
-      title          => $attr->{BTN_NAME},
+      title          => $lang{ADD},
       ex_params      => qq/onclick=addLink('$attr->{OID}','$type') /
     });
-  
-    $table->addrow($button, '') if $attr->{BTN_NAME};
+    $table->addrow($button, '');
   }
    
   return $table->show();
@@ -915,7 +916,9 @@ sub mibs_browser {
  # $Nms->{debug}=1;
   $pages_qs = ($attr->{ID}) ? "&ID=$attr->{ID}" : q{};
   my $root_index = get_function_index('mibs_browser');
-  my $ID;
+  my $oids_index = get_function_index('oid_table_edit');
+  my $mods_index = get_function_index('modules_table');
+  my $ID = 1;
   my @mods;
 
   my $nms = $Nms->obj_list({ 
@@ -924,10 +927,12 @@ sub mibs_browser {
     ID => $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW},
     SYS_OBJECTID => '_SHOW'
   });
-  if ($Nms->{TOTAL} == 1){
+  
+  my $OBJECTID = $FORM{OBJECTID} || $nms->[0]->{sysobjectid};
+
     $ID = $nms->[0]->{id};
     my $sys_mods = $Nms->modules_list({
-      OBJECTID => $nms->[0]->{sysobjectid},
+      OBJECTID => $OBJECTID,
       MODULE => '_SHOW',
       STATUS => 1
     });
@@ -937,10 +942,9 @@ sub mibs_browser {
     SNMP::loadModules(@mods);
     my @sys = split('\.', $nms->[0]->{sysobjectid});
     my $vendor = $Nms->vendors_list({ COLS_NAME => 1, ID => $sys[7], NAME => '_SHOW' });
-  }
 
   if ($FORM{OID}){
-    print nms_show({ OID => $FORM{OID}});
+    print nms_show({ OID => $FORM{OID}, EDIT => 1 });
     if ($FORM{GET}){
       print nms_snmp_get({ IP => $nms->[0]->{ip}, OID => $FORM{OID}});
     } 
@@ -955,29 +959,6 @@ sub mibs_browser {
     }
     return 1;
   }
-  if (!$FORM{IP} && !$FORM{ID}){
-    my $obj_select = $html->form_select(
-      'ID',
-      {
-        SELECTED => $FORM{ID},
-        SEL_LIST => $Nms->obj_list(
-          {
-            IP  => '_SHOW',
-            SYS_LOCATION => '_SHOW',
-            COLS_NAME => 1,
-            SORT      => 1,
-            PAGE_ROWS => 10000,
-          }
-        ),
-        SEL_KEY        => 'id',
-        SEL_VALUE      => 'ip,sysLocation',
-        NO_ID          => 1,
-        MAIN_MENU_ARGV => "ID=" . ($FORM{ID} || '')
-       }
-    );
-
-    print $html->element('div', $obj_select, { class => 'navbar navbar-default' });
-  }
 
   my $res = $html->element('div', '',
                 { 
@@ -986,71 +967,44 @@ sub mibs_browser {
                 style => 'overflow-y:scroll;overflow-x:scroll;height:75vh;outline: 1px solid silver'
               });
 
-  my $tree = $html->element('div', mibs_tree2(),
+  my $mod_btn = $html->button($lang{MODULES}, "index=$mods_index&OBJECTID=$OBJECTID", {class =>"btn btn-primary btn-sm"});
+  my $search = $html->element('input', '', { 
+    class => 'search-input form-control input-sm',
+    placeholder => 'press Enter for search'
+  });
+  my $funct_div = $html->element('div', $search ."   ". $mod_btn, { class => 'form-inline' } );
+  my $tree = $html->element('div', $funct_div . mibs_tree(),
                   { 
                   class => 'col-md-3',
                   style => 'overflow-y: scroll;height:75vh;outline: 1px solid silver'
                 });
   my $scr = qq(
-         <script>
-          var id = '$ID';
+   <script>
+    var id = '$ID';
 
-          function renewLeftBox(itemName,Action,id,iid){
-          iid = iid ? iid : 0 ;
-          var url = 'index.cgi?qindex=$root_index&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
-            \$('#RESULT').load(url);
-          };
-          \$('#MY_TREE').on("changed.jstree", function (e, data) {
-              renewLeftBox(data.selected,'SHOW', id)
-          });
-        </script>); 
+    function addLink(oid,type){
+      \$.get('index.cgi?qindex=$oids_index&header=2&OBJECTID=$OBJECTID&add=' + oid + '&TYPE=' + type);
+    };
+
+    function renewLeftBox(itemName,Action,id,iid){
+    iid = iid ? iid : 0 ;
+    var url = 'index.cgi?qindex=$root_index&OBJECTID=$OBJECTID&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
+      \$('#RESULT').load(url);
+    };
+    \$('#MY_TREE').on("changed.jstree", function (e, data) {
+        renewLeftBox(data.instance.get_node(data.selected[0]).text,'SHOW', id)
+    });
+    \$(".search-input").keypress(function(e) {
+      if (e.which == 13) {
+        var searchString = \$(this).val();
+        console.log(searchString);
+        \$('#MY_TREE').jstree('search', searchString);
+      }
+    });
+  </script>); 
 
   print $tree.$res.$scr;
   return 1;
-}
-
-#**********************************************************
-
-=head2 mibs_tree()
-
-=cut
-
-#**********************************************************
-sub mibs_tree {
-
-  my ($attr) = @_;
-
-  SNMP::loadModules(@{$attr->{MODULES}});
-  my %labels;
-  my @tree_arr;
-  foreach my $oid (keys(%SNMP::MIB)) {
-      if ( $attr->{LABEL} ) {
-        $labels{$SNMP::MIB{$oid}{label}} = $SNMP::MIB{$oid}{objectID} if  $SNMP::MIB{$oid}{label} =~ /$attr->{LABEL}/
-      }
-      else {
-        my $prev_id = ($SNMP::MIB{$oid}{parent})? $SNMP::MIB{$oid}{parent}{objectID} : 0 ;
-        my $name = $SNMP::MIB{$oid}{label};
-        if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] || ( $SNMP::MIB{$oid}{indexes}[0] && !$attr->{ONLY_TBL} ) ){
-          $name = "<p class='tree-item-table'>$SNMP::MIB{$oid}{label}</p>";
-        } 
-        elsif ( $SNMP::MIB{$oid}{parent} && $SNMP::MIB{$oid}{parent}{indexes}[0]){
-          $name = "<p class='tree-item-row'>$SNMP::MIB{$oid}{label}</p>";
-        } 
-        elsif ( $SNMP::MIB{$oid}{type}){
-          $name = "<p class='tree-item-item'>$SNMP::MIB{$oid}{label}</p>";
-        }
-        push @tree_arr, ({
-          ID => $SNMP::MIB{$oid}{objectID},
-          NAME => $name,
-          VALUE => $SNMP::MIB{$oid}{objectID},
-          PARENT_ID => $prev_id
-        });
-    }
-  }
-
-  return \%labels if $attr->{LABEL};
-  
-  return $html->tree_menu( \@tree_arr, 'OIDS',{OUTPUT2RETURN=>1});
 }
 
 #**********************************************************
@@ -1351,7 +1305,7 @@ sub oid_enums {
 =cut
 
 #**********************************************************
-sub mibs_tree2 {
+sub mibs_tree {
 
   my ($attr) = @_;
 
@@ -1359,10 +1313,13 @@ sub mibs_tree2 {
   my %labels;
   my @tree_arr=[];
   foreach my $oid (sort keys(%SNMP::MIB)) {
+    if ( $attr->{LABEL} ) {
+      $labels{$SNMP::MIB{$oid}{label}} = $SNMP::MIB{$oid}{objectID} if  $SNMP::MIB{$oid}{label} =~ /$attr->{LABEL}/
+    }
     my $prev_id = ($SNMP::MIB{$oid}{parent})? $SNMP::MIB{$oid}{parent}{objectID} : '#' ;
     my $icon = '';
     my %type = ();
-    if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] || ( $SNMP::MIB{$oid}{indexes}[0] && !$attr->{ONLY_TBL} ) ){
+    if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] ){
       $type{type} = 'table';
     } 
     elsif ( $SNMP::MIB{$oid}{parent} && $SNMP::MIB{$oid}{parent}{indexes}[0]){
@@ -1402,21 +1359,14 @@ sub make_tree {
 
   my $TREE_ID = 'MY_TREE';
   my $DATA  = JSON->new->encode(\@data);
+  
   $result.= qq{
     <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
     <script type='text/javascript' src='/styles/lte_adm/plugins/jstree/jstree.min.js'></script>
-    <div><input class='search-input form-control'></input></div>
     <div id=$TREE_ID></div>
   };
   $result.= qq(
     <script>
-      \$(".search-input").keypress(function(e) {
-        if (e.which == 13) {
-          var searchString = \$(this).val();
-          console.log(searchString);
-          \$('#$TREE_ID').jstree('search', searchString);
-        }
-      });
       \$('#$TREE_ID').jstree({
     		'core' : {
           'themes': {
