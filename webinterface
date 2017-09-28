@@ -390,14 +390,14 @@ sub nms_obj_data {
     {
       COLS_NAME => 1,
       OBJECTID  => $prm->{sysobjectid},
-      TYPE      => '_SHOW',
+      TYPE      => 'scalar',
       LABEL     => '_SHOW',
       IID       => '_SHOW',
     }
   );
   my @vars;
   foreach my $b (@$info) {
-    push @vars, [$b->{label},$b->{iid} || 0] if !$b->{type}
+    push @vars, [$b->{label},$b->{iid} || 0]
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{EQUIPMENT_SNMP_COMMUNITY_RO};
@@ -544,42 +544,8 @@ sub oid_table_edit {
     push @mods, $val->[0];
   }
   SNMP::loadModules(@mods);
-  if ($FORM{OID}){
-    print nms_show({
-      OID => $FORM{OID},
-      BTN_NAME => $lang{ADD},
-      BTN_EXT => qq/onclick=addLink()/
-    });
-    return 1;
-  }
-  if ( $FORM{add} && $FORM{add} eq '1') {
-    my $tree = $html->element('div', mibs_tree({ONLY_TBL => 1}),
-                    { 
-                    class => 'col-md-3 text-right',
-                    style => 'overflow-y: scroll;height:75vh;outline: 1px solid silver'
-                  });
 
-    my $res = $html->element('div','',
-                  {
-                    id => 'RESULT',
-                    class => 'col-md-9 text-left',
-                 });
-  
-    my $OBJECTID = $FORM{OBJECTID};
-    my $OID = $FORM{OID} || '';
-    my $scr = qq(<script>
-            function addLink(oid,type){
-              \$.get('index.cgi?qindex=$index&header=2&OBJECTID=$OBJECTID&add=' + oid + '&TYPE=' + type);
-            };
-            function renewLeftBox(itemName){
- 
-             var url = 'index.cgi?qindex=$index&header=2&add=1&OBJECTID=$OBJECTID&OID=' + itemName;
-              \$('#RESULT').load(url);
-            };
-            \$('.tree-menu').find('.tree-item-table').on('click', function(){ renewLeftBox(this.innerText) })
-            \$('.tree-menu').find('.tree-item-row').on('click', function(){ renewLeftBox(this.innerText) })
-            \$('.tree-menu').find('.tree-item-item').on('click', function(){ renewLeftBox(this.innerText) })
-          </script>); 
+  if ( $FORM{add} && $FORM{add} eq '1') {
     print mibs_browser({EDIT => 1});
     return 1;
   }
@@ -598,6 +564,7 @@ sub oid_table_edit {
   } 
   else {
     $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+ #   $LIST_PARAMS{TYPE} = 'table'&&'scalar';
     result_former({
       INPUT_DATA      => $Nms,
       FUNCTION        => 'oids_list',
@@ -888,7 +855,7 @@ sub nms_show {
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
   if ($attr->{EDIT}){
-    my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : '';
+    my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : 'scalar';
     my $button = $html->button( $lang{ADD}, undef, {
       JAVASCRIPT     => '',
       SKIP_HREF      => 1,
@@ -1001,6 +968,9 @@ sub mibs_browser {
         \$('#MY_TREE').jstree('search', searchString);
       }
     });
+  	\$.jstree.defaults.contextmenu.items = { };
+    \$('#MY_TREE').on('contextmenu', '.jstree-anchor', function (e) {
+  	});
   </script>); 
 
   print $tree.$res.$scr;

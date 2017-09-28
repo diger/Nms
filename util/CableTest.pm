@@ -10,7 +10,7 @@ use strict;
 use warnings FATAL => 'all';
 use Abills::Base qw(ip2int mk_unique_value);
 use Dv;
-use Nms::db::Cable;
+
 our(
   %lang,
   $Equipment,
@@ -20,7 +20,7 @@ our(
   $admin,
   $db
 );
-our $Cable = Cable->new( $db, $admin, \%conf );
+
 my $Dv = Dv->new( $db, $admin, \%conf );
 
 #**********************************************************
@@ -69,11 +69,12 @@ sub cable_test {
   );
 
   print $table->show();
-  my $test_param = $Cable->cable_test_list({
+  my $test_param = $Nms->oids_list({
     OBJECTID  => $mod->[0]->{sysobjectid},
     LABEL     => '_SHOW',
-    TYPE      => '_SHOW',
-    LIST2HASH => 'label,type'
+    SECTION   => '_SHOW',
+    TYPE      => 'cable',
+    LIST2HASH => 'label,section'
   });
   my $mib;
   my @vars;
@@ -211,13 +212,14 @@ sub cable_test_edit {
   my ($attr) = @_;
 
   if ( $FORM{del} ) {
-    $Cable->cable_test_del($FORM{del});
+    $Nms->oid_del($FORM{del});
   }
   if ( $FORM{SAVE} ) {
-    $Cable->cable_test_add({
+    $Nms->obj_oids_add({
       LABEL    => $FORM{LABEL},
-      TYPE     => $FORM{TYPE},
+      TYPE     => 'cable',
       OBJECTID => $FORM{OBJECTID},
+      SECTION  => $FORM{TYPE},
     });
   }
   
@@ -281,10 +283,11 @@ sub cable_test_edit {
   }
   else {
     $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+    $LIST_PARAMS{TYPE} = 'cable';
     result_former({
-      INPUT_DATA      => $Cable,
-      FUNCTION        => 'cable_test_list',
-      DEFAULT_FIELDS  => 'LABEL,TYPE',
+      INPUT_DATA      => $Nms,
+      FUNCTION        => 'oids_list',
+      DEFAULT_FIELDS  => 'LABEL,SECTION',
       FUNCTION_FIELDS => 'cable_test_edit:change:id;type;label;objectid,del',
       HIDDEN_FIELDS   => 'ID,OBJECTID',
       EXT_TITLES      => {
