@@ -52,7 +52,7 @@ sub obj_list {
 
   my $SECRETKEY = $CONF->{secretkey} || '';
   my $WHERE =  $self->search_former($attr, [
-    ['IP',           'IP',  'ip',  'INET_NTOA(o.ip) AS ip' ],
+    ['IP',           'IP',  'o.ip',  'INET_NTOA(o.ip) AS ip' ],
 	  ['NAS_NAME',     'STR', 'name',                      1 ],
 	  ['SYS_NAME',     'STR', 'sysname',                   1 ],
 	  ['SYS_LOCATION', 'STR', 'syslocation',               1 ],

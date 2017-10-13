@@ -10,10 +10,10 @@ use strict;
 use warnings FATAL => 'all';
 use Abills::Base qw(ip2int mk_unique_value);
 use Dv;
+use Cid_auth;
 
 our(
   %lang,
-  $Equipment,
   $Nms,
   $html,
   %conf,
@@ -22,6 +22,7 @@ our(
 );
 
 my $Dv = Dv->new( $db, $admin, \%conf );
+my $Cid_auth = Cid_auth->new( $db, $admin, \%conf );
 
 #**********************************************************
 =head2 cable_test()
@@ -31,19 +32,20 @@ my $Dv = Dv->new( $db, $admin, \%conf );
 sub cable_test {
   my ($attr) = @_;
   my $user = $Dv->list({ UID => $FORM{UID}, CID => '_SHOW' });
+  my $nms_index = get_function_index('nms_obj');
 
-  my $equip = $Equipment->mac_log_list({
+  my $equip = $Cid_auth->get_host({
       COLS_NAME => 1,
-      PORT      => '_SHOW',
-      MAC       => $user->[0]->[0],
-      NAS_ID    => '_SHOW',
+      PORTS     => '_SHOW',
+      USER_MAC  => $user->[0]->[0],
+      NAS       => '_SHOW',
     }
   );
 
   my $mod = $Nms->obj_list(
     {
       COLS_NAME    => 1,
-      NAS_ID       => $equip->[0]->{nas_id},
+      NAS_ID       => $equip->{NAS},
       IP           => '_SHOW',
       NAS_NAME     => '_SHOW',
       SYS_OBJECTID => '_SHOW',
@@ -59,8 +61,8 @@ sub cable_test {
           HAS_FUNCTION_FIELDS => 1
       }
     );
-  $table->addrow( $mod->[0]->{name}, $mod->[0]->{ip}, $equip->[0]->{port},
-  $html->button('', "index=$index$pages_qs&IP=". $mod->[0]->{ip} . "&PORT=". $equip->[0]->{port},
+  $table->addrow( $mod->[0]->{name}, $mod->[0]->{ip}, $equip->{PORTS},
+  $html->button('', "index=$nms_index&ID=". $mod->[0]->{id} ,
           {
           ICON  => 'glyphicon glyphicon-random text-info',
           title => $lang{DEL},
@@ -82,28 +84,19 @@ sub cable_test {
 
   foreach my $key (keys %$test_param) {
     $mib =  $key if $test_param->{$key} eq 'action';
-    push @vars, [$key,$equip->[0]->{port}] if $test_param->{$key} ne 'action';
+    push @vars, [$key,$equip->{PORTS}] if $test_param->{$key} ne 'action';
     push @{$pair{$test_param->{$key}}}, $key;
   }
 
-  my @mods;
-  my $sys_mods = $Nms->modules_list({
-    OBJECTID => $mod->[0]->{sysobjectid},
-    MODULE => '_SHOW',
-    STATUS => 1
-  });
-  foreach my $val (@$sys_mods) {
-    push @mods, $val->[0];
-  }
-  SNMP::loadModules(@mods);
+  load_mibs({ OBJECTID => $mod->[0]->{sysobjectid} });
   my %snmpparms;
   $snmpparms{Version} = 2;
   $snmpparms{Retries} = 1;
   $snmpparms{Timeout} = 2000000;
-  $snmpparms{Community} = $attr->{COMMUNITY} || $conf{EQUIPMENT_SNMP_COMMUNITY_RW};
+  $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
   my $sess = SNMP::Session->new(DestHost => $mod->[0]->{ip}, %snmpparms);
   my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-  my $vb = new SNMP::Varbind([$mib,$equip->[0]->{port},$value]);
+  my $vb = new SNMP::Varbind([$mib,$equip->{PORTS},$value]);
   $sess->set($vb);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
@@ -224,16 +217,6 @@ sub cable_test_edit {
   }
   
   if ( $FORM{add} ) {
-    my @mods;
-    my $sys_mods = $Nms->modules_list({
-      OBJECTID => $FORM{OBJECTID},
-      MODULE => '_SHOW',
-      STATUS => 1
-    });
-    foreach my $val (@$sys_mods) {
-      push @mods, $val->[0];
-    }
-    SNMP::loadModules(@mods);
     my @labels;
     foreach my $oid (keys(%SNMP::MIB)) {
       if  ( $SNMP::MIB{$oid}{label} =~ /Cable/ || $SNMP::MIB{$oid}{label} =~ /cable/
@@ -288,7 +271,7 @@ sub cable_test_edit {
       INPUT_DATA      => $Nms,
       FUNCTION        => 'oids_list',
       DEFAULT_FIELDS  => 'LABEL,SECTION',
-      FUNCTION_FIELDS => 'cable_test_edit:change:id;type;label;objectid,del',
+      FUNCTION_FIELDS => 'cable_test_edit:change:id;section;label;objectid,del',
       HIDDEN_FIELDS   => 'ID,OBJECTID',
       EXT_TITLES      => {
         label => "$lang{NAME}",
