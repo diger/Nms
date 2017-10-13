@@ -3,9 +3,11 @@
   "2:1:OIDS:oid_table_edit:OBJECTID"        => 5,
   "3:1:SNMP Modules:modules_table:OBJECTID" => 5,
   "4:1:Cable Test:cable_test_setup:"        => 5,
-  "5:0:NMS:nms_obj:"                        => 8,
-  "6:0:MIBS browser:mibs_browser:"          => 8,
-  "7:0:Cable test:cable_test:UID"           => 20,
+  "5:1:Traps:nms_trap_types:"               => 5,
+  "6:0:NMS:nms_obj:"                        => 8,
+  "7:0:MIBS browser:mibs_browser:"          => 8,
+  "8:0:Traps:nms_traps:"           => 8,
+  "9:0:Cable test:cable_test:UID"           => 20,
 );
 
 1
