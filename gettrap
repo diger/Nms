@@ -1,0 +1,244 @@
+#!/usr/bin/perl -w 
+
+=head1 NAME
+
+  Trap sensor
+
+=cut
+
+use strict;
+use warnings;
+no warnings qw(numeric);
+
+BEGIN {
+  use FindBin '$Bin';
+  our $libpath = $Bin . '/../';
+  my $sql_type = 'mysql';
+  unshift(@INC, $libpath . "Abills/$sql_type/", $libpath . '/lib/', $libpath . "Abills/modules/Nms/db");
+}
+
+use Abills::Base qw(parse_arguments int2byte ip2int int2ip load_pmodule2 sec2time);
+
+#use threads;
+use Data::Dumper;
+use Abills::Server;
+use Abills::Misc;
+use Abills::Filters qw(bin2hex _mac_former mac2dec);
+use Abills::Sender::Core;
+use Log qw(log_add);
+use Admins;
+use Nms;
+use Traps;
+
+our (%conf, $DATE, $TIME, $var_dir);
+
+load_pmodule2('Net::SNMPTrapd');
+load_pmodule2('SNMP');
+
+if ($#ARGV < 0) {
+  help();
+  exit;
+}
+
+SNMP::addMibDirs( $Bin . "/../var/snmp/mibs" );
+SNMP::addMibDirs( $Bin . "/../var/snmp/mibs/private" );
+SNMP::addMibFiles(glob($Bin . "/../var/snmp/mibs/private" . "/*"));
+SNMP::initMib();
+
+my $debug = 0;
+do $Bin . '/config.pl';
+my $Log = Log->new(undef, \%conf);
+
+my $argv = parse_arguments(\@ARGV);
+
+my $logs_dir = ($argv->{trapdir}) ? $argv->{trapdir} : $var_dir . "log/";
+my $pid_dir = ($argv->{trapdir}) ? $argv->{trapdir} : $var_dir . "run/";
+
+if (! -d $pid_dir) {
+  print "Dir: $pid_dir not exists.";
+  if(mkdir($pid_dir)) {
+    print "$pid_dir created\n";
+  }
+}
+
+$Log->{LOG_FILE} = "$logs_dir/traps.log";
+
+if (!$argv->{LOG_FILE} && !defined($argv->{'start'})) {
+  $Log->{PRINT} = 1;
+}
+
+if (defined($argv->{DEBUG})) {
+  print "Debug mode on\n";
+  $debug = $argv->{DEBUG};
+}
+elsif (defined($argv->{help})) {
+  print "Help:\n";
+}
+
+#Demonize section
+if (defined($argv->{'start'}) && !defined($argv->{DEBUG})) {
+  print "Start... debug: $debug\n";
+
+  my $pid_file = daemonize(
+    {
+      PROGRAM_NAME => 'gettrap',
+      LOG_DIR      => $pid_dir
+    }
+  );
+
+  $Log->log_print('LOG_EMERG', '', "gettrap Daemonize... $pid_file");
+}
+
+#Stop daemon
+elsif (defined($argv->{stop})) {
+  stop_server($pid_dir . "/gettrap.pid");
+
+  exit;
+}
+elsif (make_pid($pid_dir . "/gettrap.pid") == 1) {
+  print "Already running PID: !\n";
+  exit;
+}
+
+require Abills::SQL;
+my $db = Abills::SQL->connect($conf{dbtype}, $conf{dbhost}, $conf{dbname}, $conf{dbuser}, $conf{dbpasswd});
+my $Admin = Admins->new($db, \%conf);
+$Admin->info($conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' });
+
+my $Nms = Nms->new($db, $Admin, \%conf);
+my $Traps = Traps->new($db, $Admin, \%conf);
+my $Sender = Abills::Sender::Core->new($db, $Admin, \%conf);
+my %send_attr = (
+  JID        => $conf{XMPP_ALERT_JID},
+  PASS       => $conf{XMPP_ALERT_JID_PASS},
+  SENDER_TYPE => 'XMPP',
+  TYPE        => 'chat'
+);
+
+#use constant THREADS_COUNT => 4;
+my $bindip = $argv->{IP} || $conf{GETTRAP_IP} || '';
+my $snmptrapd = Net::SNMPTrapd->new(Family => 'ipv4', LocalAddr => $bindip, LocalPort => 162, timeout => 3) 
+  or die "Error creating SNMPTrapd listener: ", Net::SNMPTrapd->error;
+my $names = $Nms->obj_list({
+  PAGE_ROWS => 1000,
+  IP        => '_SHOW',
+  NAS_ID    => '_SHOW',
+  LIST2HASH => 'ip,nas_id'
+});
+my $mac_notif = $Nms->oids_list({
+  LABEL     => '_SHOW',
+  SECTION   => '_SHOW',
+  TYPE      => 'mac_notif',
+  LIST2HASH => 'section,label'
+});
+my $alerts = $Nms->oids_list({
+  LABEL     => '_SHOW',
+  SECTION   => '_SHOW',
+  TYPE      => 'alert',
+  LIST2HASH => 'section,label'
+});
+
+#for my $i (1..(THREADS_COUNT - 1)) { threads->create(\&request_loop, $obj); }
+#request_loop($obj);
+if (defined($argv->{'start'}) || defined($argv->{DEBUG})) {
+  request_loop();
+}
+else {
+  help();
+}
+
+sub request_loop {
+  while (1) {
+    my $trap     = $snmptrapd->get_trap();
+    my %varbinds = ();
+    my $trapoid = ();
+
+    if (!defined($trap)) {
+      printf "$0: %s\n", Net::SNMPTrapd->error;
+      exit 1;
+    }
+    elsif ($trap == 0) {
+      next;
+    }
+
+    if (!defined($trap->process_trap())) {
+      printf "$0: %s\n", Net::SNMPTrapd->error;
+    }
+    else {
+      if ($debug >= 5) {
+        print "IP:" . $trap->remoteaddr . "\n";
+        print $trap->dump();
+      }
+
+      my $eventname = $trap->varbinds->[1]->{'1.3.6.1.6.3.1.1.4.1.0'};
+      if ( $conf{NMS_MAC_NOTIF} && exists $mac_notif->{$SNMP::MIB{$eventname}{label}} ) {
+        eval { require Cid_auth; };
+        if ($@) {
+          print $@;
+        }
+        else {
+        	my $Cid_auth = Cid_auth->new($db, $Admin, \%conf);
+          my $syntax = $SNMP::MIB{$mac_notif->{$SNMP::MIB{$eventname}{label}}}{syntax};
+          $Cid_auth->mac_notif({
+            IP    => $trap->remoteaddr,
+            VALUE => $trap->varbinds,
+            NOTIF => $syntax
+          },{NAS_ID => $names->{$trap->remoteaddr}, PASS => $conf{NMS_COMMUNITY_RO} });
+          if ($debug >= 5) {
+            print "Port: $Cid_auth->{PORT} MAC: $Cid_auth->{MAC}
+            NAS_ID: $names->{$trap->remoteaddr} VLAN: $Cid_auth->{PVID} \n";
+          }
+          if ( $Cid_auth->{error} ){
+            $Sender->send_message({
+              UID        => 1,
+              TO_ADDRESS => 'admin@freenet59.ru',
+              MESSAGE    => "\nIP " . $trap->remoteaddr ." $Cid_auth->{error}",
+              %send_attr
+            });
+          }
+        }
+      }
+      else {
+        my $id_num = $Traps->trap_add({
+          IP        => $trap->remoteaddr,
+          EVENTNAME => $eventname,
+          TIMETICKS => $trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'}
+        });
+        splice(@{ $trap->varbinds }, 0, 2);
+        foreach my $el (@{ $trap->varbinds }) {
+          my @oid = keys %$el;
+          my @value = values %$el;
+          $Traps->trap_values_add({
+            ID    => $id_num->{INSERT_ID},
+            LABEL => $oid[0],
+            VALUE => $value[0]
+          });
+        }
+        if ( exists $alerts->{$SNMP::MIB{$eventname}{label}} ) {
+          $Sender->send_message({
+            UID        => 1,
+            TO_ADDRESS => 'admin@freenet59.ru',
+            MESSAGE     => "\nIP " . $trap->remoteaddr . " $names->{$trap->remoteaddr} - $SNMP::MIB{$eventname}{label}",
+            %send_attr
+          });
+        }
+      }
+    }
+  }
+}
+
+sub help {
+
+  print "ABillS snmp traps
+  gettrap [Options]
+  Options:
+   log        - Log file for gettrap logs
+   IP         - IP address for gettrap binding
+   DEBUG      - debug mode 0..5
+
+   start      - run as service
+   stop       - stop gettrap service
+   \n";
+
+  return 1;
+}
