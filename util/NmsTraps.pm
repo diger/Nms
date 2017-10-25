@@ -32,10 +32,17 @@ SNMP::initMib();
 #**********************************************************
 sub nms_traps {
   my ($attr) = @_;
-  
   SNMP::addMibFiles(glob('../../var/snmp/mibs/private' . '/*'));
   SNMP::loadModules('LLDP-MIB');
 
+  if ($FORM{ALERT}){
+    my $oids = $Nms->oids_list({ TYPE => 'alert', SECTION => '_SHOW', COLS_NAME => 1 });
+    my @alerts_arr;
+    foreach my $oid (@$oids) {
+      push @alerts_arr, substr($SNMP::MIB{$oid->{section}}{objectID},1);
+    }
+    $LIST_PARAMS{oid} = join(",", @alerts_arr);
+  }
   if ($attr->{PAGE_ROWS}){
 	  $LIST_PARAMS{PAGE_ROWS} = $attr->{PAGE_ROWS};
 	  $LIST_PARAMS{MONIT} = 1;
@@ -64,20 +71,20 @@ sub nms_traps {
   result_former({
     INPUT_DATA      => $Traps,
     FUNCTION        => 'traps_list',
-    DEFAULT_FIELDS  => 'TRAPTIME, IP, EVENTNAME',
-    FUNCTION_FIELDS => 'nms_traps:stats:id;&pg='.($FORM{pg}||''),
+    DEFAULT_FIELDS  => 'TRAPTIME, IP, LABEL, TIMETICKS',
+#    FUNCTION_FIELDS => 'nms_traps:stats:id;&pg='.($FORM{pg}||''),
     HIDDEN_FIELDS   => 'ID',
     EXT_TITLES      => {
-      traptime    => $lang{TIME},
-      name        => $lang{NAME},
-      eventname   => $lang{EVENTS},
-      ip      => "IP ".$lang{ADDRESS},
+      traptime => $lang{TIME},
+      label     => $lang{NAME},
+      oid      => 'OID',
+      ip       => "IP ".$lang{ADDRESS},
     },
     SKIP_USER_TITLE => 1,
     FILTER_COLS  => {
-      ip => "search_link:nms_obj:,IP",
-      eventname => 'oid_conv::,ID',
-    },
+      ip    => "search_link:nms_obj:,IP",
+      label => 'oid_conv::,ID',
+     },
     TABLE           => {
       width   => '100%',
       caption => "$lang{TRAPS}",
@@ -86,7 +93,7 @@ sub nms_traps {
       ID      => 'TRAPS_LIST',
     },
     MAKE_ROWS => 1,
-    TOTAL     => 1
+    TOTAL     => 1,
   });
   my $scr = qq(
     <script>
@@ -106,19 +113,9 @@ sub nms_traps {
 =cut
 #********************************************************
 sub nms_traps_clean{
-  $Traps->traps_del({ PERIOD => $conf{TRAPS_CLEAN_PERIOD} || 30 });
+  $Traps->nms_traps_del({ PERIOD => $conf{TRAPS_CLEAN_PERIOD} || 30 });
+  return 1
 }
-
-#**********************************************************
-=head2 equipment_monitor()
-
-=cut
-#**********************************************************
-sub nms_monitor {
-  my $traps_pg_rows = $FORM{FILTER} || 10;
-  return 1;
-}
-
 #**********************************************************
 =head2 nms_trap_types() -
 
@@ -197,7 +194,7 @@ sub nms_trap_types {
         header => $modal_btn,
        },
        MAKE_ROWS => 1,
-       TOTAL     => 1
+       TOTAL     => 1,
     });
   }
 
@@ -205,7 +202,8 @@ sub nms_trap_types {
 }
 
 #**********************************************************
-=head2 oid_conv($attr) - conv numerical oid to human
+=head2 oid_conv($attr) - conv oid to html link
+ STR conv numerical oid to human
 
 =cut
 #**********************************************************

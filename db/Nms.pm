@@ -57,6 +57,7 @@ sub obj_list {
 	  ['SYS_NAME',     'STR', 'sysname',                   1 ],
 	  ['SYS_LOCATION', 'STR', 'syslocation',               1 ],
     ['SYS_OBJECTID', 'STR', 'sysobjectid',               1 ],
+    ['STATUS',       'INT', 'status',                    1 ],
 	  ['ID',           'INT', 'o.id',                      1 ],
 	  ['NAS_ID',       'INT', 'n.id',       'n.id AS nas_id' ],
 	  ['RO_COMMUNITY', 'STR', '', "DECODE(ro_community, '$SECRETKEY') AS ro_community"],
@@ -506,4 +507,4 @@ sub module_del {
 
 
 
-1
+1;

@@ -96,13 +96,13 @@ sub cable_test {
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
   my $sess = SNMP::Session->new(DestHost => $mod->[0]->{ip}, %snmpparms);
   my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-  my $vb = new SNMP::Varbind([$mib,$equip->{PORTS},$value]);
+  my $vb = SNMP::Varbind->new([$mib,$equip->{PORTS},$value]);
   $sess->set($vb);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
   sleep(2);
-  my $vl = new SNMP::VarList(@vars);
+  my $vl = SNMP::VarList->new(@vars);
   $sess->get($vl);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});

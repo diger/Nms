@@ -17,7 +17,7 @@ BEGIN {
   unshift(@INC, $libpath . "Abills/$sql_type/", $libpath . '/lib/', $libpath . "Abills/modules/Nms/db");
 }
 
-use Abills::Base qw(parse_arguments int2byte ip2int int2ip load_pmodule2 sec2time);
+use Abills::Base qw(parse_arguments load_pmodule2);
 
 #use threads;
 use Data::Dumper;
@@ -185,8 +185,7 @@ sub request_loop {
             NOTIF => $syntax
           },{NAS_ID => $names->{$trap->remoteaddr}, PASS => $conf{NMS_COMMUNITY_RO} });
           if ($debug >= 5) {
-            print "Port: $Cid_auth->{PORT} MAC: $Cid_auth->{MAC}
-            NAS_ID: $names->{$trap->remoteaddr} VLAN: $Cid_auth->{PVID} \n";
+            print "Port: $Cid_auth->{PORT} MAC: $Cid_auth->{MAC} NAS: $names->{$trap->remoteaddr} VLAN: $Cid_auth->{PVID} \n";
           }
           if ( $Cid_auth->{error} ){
             $Sender->send_message({
@@ -201,7 +200,8 @@ sub request_loop {
       else {
         my $id_num = $Traps->trap_add({
           IP        => $trap->remoteaddr,
-          EVENTNAME => $eventname,
+          OID       => $eventname,
+          LABEL     => $SNMP::MIB{$eventname}{label},
           TIMETICKS => $trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'}
         });
         splice(@{ $trap->varbinds }, 0, 2);
@@ -218,7 +218,7 @@ sub request_loop {
           $Sender->send_message({
             UID        => 1,
             TO_ADDRESS => 'admin@freenet59.ru',
-            MESSAGE     => "\nIP " . $trap->remoteaddr . " $names->{$trap->remoteaddr} - $SNMP::MIB{$eventname}{label}",
+            MESSAGE     => "\nIP " . $trap->remoteaddr . " $SNMP::MIB{$eventname}{label} ",
             %send_attr
           });
         }

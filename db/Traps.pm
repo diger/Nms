@@ -51,11 +51,12 @@ sub traps_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : '';
 
   my $WHERE =  $self->search_former($attr, [
-    ['ID',        'INT',  'id',           1 ],
-    ['TRAPTIME',  'DATE', 'traptime',   1 ],
-    ['IP',        'IP',   'ip', 'INET_NTOA(ip) AS ip' ],
-    ['EVENTNAME', 'STR',  'eventname',    1 ],
-	  ['TIMETICKS', 'STR',  'timeticks',    1 ],
+    ['ID',        'INT',  'id',                    1 ],
+    ['TRAPTIME',  'DATE', 'traptime',              1 ],
+    ['IP',        'IP',   'ip', 'INET_NTOA(ip) AS ip'],
+    ['LABEL',     'STR',  'label',                 1 ],
+    ['OID',       'STR',  'oid',                   1 ],
+	  ['TIMETICKS', 'STR',  'timeticks',             1 ],
     ],
     { WHERE => 1,
     }
@@ -72,7 +73,7 @@ sub traps_list {
 
   my $list = $self->{list};
   
-  if ($self->{TOTAL} > 0) {
+  if ($self->{TOTAL} > 0 && !$attr->{MONIT}) {
     $self->query2("SELECT COUNT(*) AS total
     FROM nms_traps
     $WHERE;", undef, { INFO => 1 }
@@ -145,6 +146,20 @@ sub trap_values_add {
   return $self;
 }
 
+#**********************************************************
+=head2 traps_del($attr)
+
+=cut
+#**********************************************************
+sub nms_traps_del {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query2("DELETE FROM nms_traps WHERE traptime < CURDATE() - INTERVAL $attr->{PERIOD} day;", 'do');
+
+  return $self;
+}
 
 
-1
+
+1;s
