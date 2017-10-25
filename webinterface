@@ -653,20 +653,20 @@ sub mibs_browser {
     function renewLeftBox(itemName,Action,id,iid){
     iid = iid ? iid : 0 ;
     var url = 'index.cgi?qindex=$root_index&OBJECTID=$OBJECTID&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
-      \$('#RESULT').load(url);
+      jQuery('#RESULT').load(url);
     };
-    \$('#MY_TREE').on("changed.jstree", function (e, data) {
+    jQuery('#MY_TREE').on("changed.jstree", function (e, data) {
         renewLeftBox(data.instance.get_node(data.selected[0]).text,'SHOW', id)
     });
-    \$(".search-input").keypress(function(e) {
+    jQuery(".search-input").keypress(function(e) {
       if (e.which == 13) {
-        var searchString = \$(this).val();
+        var searchString = jQuery(this).val();
         console.log(searchString);
-        \$('#MY_TREE').jstree('search', searchString);
+        jQuery('#MY_TREE').jstree('search', searchString);
       }
     });
-  	\$.jstree.defaults.contextmenu.items = { };
-    \$('#MY_TREE').on('contextmenu', '.jstree-anchor', function (e) {
+  	jQuery.jstree.defaults.contextmenu.items = { };
+    jQuery('#MY_TREE').on('contextmenu', '.jstree-anchor', function (e) {
   	});
   </script>); 
 
@@ -1050,7 +1050,7 @@ sub make_tree {
   };
   $result.= qq(
     <script>
-      \$('#$TREE_ID').jstree({
+      jQuery('#$TREE_ID').jstree({
     		'core' : {
           'themes': {
             'name': 'proton',
@@ -1146,7 +1146,7 @@ sub nms_monitor {
      var autoLoad = setInterval(
      function ()
      {
-        \$('#TRAPS').load('?get_index=nms_traps').fadeIn('slow');
+        jQuery('#TRAPS').load('?get_index=nms_traps').fadeIn('slow');
      }, 10000); // refresh page every 10 seconds
   </script>
   );
@@ -1164,7 +1164,7 @@ sub nms_monitor {
 #**********************************************************
 sub oids_set {
   my ($attr) = @_;
-  $Nms->{debug}=1;
+
   load_mibs({ OBJECTID => $FORM{OBJECTID} });
   my $heads = $Nms->oids_list({
     OBJECTID  => $FORM{OBJECTID},

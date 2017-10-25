@@ -162,4 +162,4 @@ sub nms_traps_del {
 
 
 
-1;s
+1;
