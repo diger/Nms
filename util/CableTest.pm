@@ -22,7 +22,7 @@ our(
 );
 
 my $Dv = Dv->new( $db, $admin, \%conf );
-my $Cid_auth = Cid_auth->new( $db, $admin, \%conf );
+my $Dhcphosts = Dhcphosts->new( $db, $admin, \%conf );
 
 #**********************************************************
 =head2 cable_test()
@@ -34,18 +34,18 @@ sub cable_test {
   my $user = $Dv->list({ UID => $FORM{UID}, CID => '_SHOW' });
   my $nms_index = get_function_index('nms_obj');
 
-  my $equip = $Cid_auth->get_host({
+  my $dhcp = $Dhcphosts->hosts_list({
       COLS_NAME => 1,
       PORTS     => '_SHOW',
-      USER_MAC  => $user->[0]->[0],
-      NAS       => '_SHOW',
+      MAC       => $user->[0]->[0],
+      NAS_ID    => '_SHOW',
     }
   );
 
   my $mod = $Nms->obj_list(
     {
       COLS_NAME    => 1,
-      NAS_ID       => $equip->{NAS},
+      NAS_ID       => $dhcp->[0]->{nas_id},
       IP           => '_SHOW',
       NAS_NAME     => '_SHOW',
       SYS_OBJECTID => '_SHOW',
@@ -61,7 +61,7 @@ sub cable_test {
           HAS_FUNCTION_FIELDS => 1
       }
     );
-  $table->addrow( $mod->[0]->{name}, $mod->[0]->{ip}, $equip->{PORTS},
+  $table->addrow( $mod->[0]->{name}, $mod->[0]->{ip}, $dhcp->[0]->{ports},
   $html->button('', "index=$nms_index&ID=". $mod->[0]->{id} ,
           {
           ICON  => 'glyphicon glyphicon-random text-info',
@@ -84,7 +84,7 @@ sub cable_test {
 
   foreach my $key (keys %$test_param) {
     $mib =  $key if $test_param->{$key} eq 'action';
-    push @vars, [$key,$equip->{PORTS}] if $test_param->{$key} ne 'action';
+    push @vars, [$key,$dhcp->[0]->{ports}] if $test_param->{$key} ne 'action';
     push @{$pair{$test_param->{$key}}}, $key;
   }
 
@@ -96,7 +96,7 @@ sub cable_test {
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
   my $sess = SNMP::Session->new(DestHost => $mod->[0]->{ip}, %snmpparms);
   my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-  my $vb = SNMP::Varbind->new([$mib,$equip->{PORTS},$value]);
+  my $vb = SNMP::Varbind->new([$mib,$dhcp->[0]->{ports},$value]);
   $sess->set($vb);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});

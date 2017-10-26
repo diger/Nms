@@ -983,7 +983,7 @@ sub mibs_tree {
   my ($attr) = @_;
 
   my %labels;
-  my @tree_arr=[];
+  my @tree_arr;
   foreach my $oid (sort keys(%SNMP::MIB)) {
     if ( $attr->{LABEL} || $attr->{SYNTAX} ) {
       if ( $attr->{SYNTAX} ) {
@@ -1001,7 +1001,7 @@ sub mibs_tree {
     else {
       my $prev_id = ($SNMP::MIB{$oid}{parent})? $SNMP::MIB{$oid}{parent}{objectID} : '#' ;
       my $icon = '';
-      my %type = ();
+      my %type;
       if ( $SNMP::MIB{$oid}{children}[0]{indexes}[0] ){
         $type{type} = 'table';
       } 
@@ -1039,7 +1039,6 @@ sub mibs_tree {
 sub make_tree {
   my (@data) = @_;
   my $result = '';
-
   my $TREE_ID = 'MY_TREE';
   my $DATA  = JSON->new->encode(\@data);
   
@@ -1231,13 +1230,13 @@ sub oids_edit {
 
   if ( $FORM{add}  || $FORM{ID} ) {
     print mibs_browser({EDIT => 1});
-    my $scr = qq(
+    print qq(
       <script>
         function addLink(oid,type){
           var link = '?get_index=oids_set&header=2&OBJECTID=$attr->{OBJECTID}';
           if ( type === 'table'){
             jQuery.get(link + '&OID=' + oid + '&visual=' + type, function(data){
-              loadRawToModal(link + '&OID_ID=' + data);
+              loadRawToModal(link + '&ID=' + data);
             });
           }
           else {
@@ -1246,7 +1245,7 @@ sub oids_edit {
         };
       </script>
       );
-    return $scr;
+    return 1;
   }
   else {
     $LIST_PARAMS{OBJECTID} = $attr->{OBJECTID};
@@ -1324,11 +1323,15 @@ sub oid_table_row_edit {
     push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }) .
     "  " . $html->element('span', '', { class => '' }), {CTRL => 1} );
   }
-	print $html->element('div', 
-    $html->element('button','&times;', { class => 'close', 'data-dismiss' => 'modal', type=>'button' }).
-    $html->element('h4', $oid->{label}, { class => 'modal-title' }),
+	print $html->element('div', $html->element('h4', $oid->{label}, { class => 'modal-title' }),
     { class => 'modal-header' });
-  print $html->element('div', $html->element('form',"@colls", { class => 'form-horizontal' }), { class => 'modal-body' });
+  my $btn = $html->element('button', ($FORM{IN_MODAL})? $lang{CLOSE}: $lang{BACK}, {
+    class => 'btn btn-default',
+    'data-dismiss' => 'modal',
+    type=>'button',
+    onclick => (!$FORM{IN_MODAL})? 'goBack()':''
+   });
+  print $html->element('div', $html->element('form',"@colls" . $btn , { class => 'form-horizontal' }), { class => 'modal-body' });
   
   my $scr = qq(
          <script>
@@ -1345,6 +1348,9 @@ sub oid_table_row_edit {
                });
              }
          });
+         function goBack() {
+             window.history.back();
+         }
          </script>
          );
   print $scr;
