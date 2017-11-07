@@ -272,27 +272,7 @@ sub nms_obj {
       SKIP_PAGES      => 1,
       TOTAL           => 1
     });
-    print '<script>$(function () {
-    var table = $("#OBJ_LIST_")
-      .DataTable({
-        "language": {
-          paginate: {
-              first:    "«",
-              previous: "‹",
-              next:     "›",
-              last:     "»",
-          },
-          "zeroRecords":    "'.$lang{NOT_EXIST}.'",
-          "lengthMenu":     "'.$lang{SHOW}.' _MENU_",
-          "search":         "'.$lang{SEARCH}.':",
-          "info":           "'.$lang{SHOWING}.' _START_ - _END_ '.$lang{OF}.' _TOTAL_ ",
-          "infoEmpty":      "'.$lang{SHOWING}.' 0",
-          "infoFiltered":   "('.$lang{TOTAL}.' _MAX_)",
-      },
-      "ordering": false,
-      "lengthMenu": [[25, 50, -1], [25, 50, "'.$lang{ALL}.'"]]
-      });
-    });</script>' if !$attr->{STATUS};
+    print simple_table() if !$attr->{STATUS};
   }
   return 1;
 }
@@ -409,31 +389,30 @@ sub oid_table {
     }
   );
  
-  my @li;
-  my @panel;
+  my @tab_cont;
+  my @header_arr;
 
   foreach my $t (@$tbl) {
     my $rows = $Nms->oids_rows_list({ ID => $t->{id} });
     my @vars;
     foreach my $row (@$rows) {
-      push @vars, $row->[1]
+      push @vars, $row->[1];
     }
-  my $active = ( @panel < 1 )?'in active':'';
-  push @li, $html->element('li', "<a data-toggle='tab' href='#" . $t->{label} . "'>" . $t->{label} . "</a>", { class => ( @li < 1 )?'active':'' });
-  push @panel, $html->element('div', nms_snmp_table({
-    SECT => $attr->{SECT},
-    OID => $t->{label},
-    columns => [ @vars ],
-    IP => $info->[0]->{ip}
-  }), { id => $t->{label}, class => "tab-pane fade" . (( @panel < 1 )?'in active':'') });  
+
+    push @tab_cont, $html->element('div', nms_snmp_table({
+      SECT => $attr->{SECT},
+      OID => $t->{label},
+      columns => [ @vars ],
+      IP => $info->[0]->{ip}
+    }), { id => $t->{label}, class => "tab-pane fade" . (( @tab_cont < 1 )?'in active':'') });
+    push @header_arr, "$t->{label}:#$t->{label}:data-toggle='tab'"; 
   }
 
+  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
   my $edit = $html->button($lang{EDIT}, "index=$index&edit=1", { ICON => 'fa fa-pencil-square-o', });
+  my $tab = $html->element('div', "@tab_cont", { class => 'tab-content' });
 
-  my $ul = $html->element('ul', "@li", { class => 'nav nav-tabs' });
-  my $tab = $html->element('div', "@panel", { class => 'tab-content' });
-
-  print $ul . $tab;
+  print $buttons . $tab;
 
   return 1;
 }
@@ -477,52 +456,45 @@ sub nms_snmp_table {
 #  $snmpparms{Timeout} = 10000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
-
   if (!$attr->{columns}){
-      foreach my $c (sort { $b <=> $a } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
+      foreach my $c (sort { $a <=> $b } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
       push @{$attr->{columns}}, $c->{'label'};
       }
   }
 
-  my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}] );
-
-  if ( $sess->{ErrorNum} ) {
-    return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
-  }
- 
-  my $table = $html->table({ title_plain => [ @{$attr->{columns}} ], });
-
-  foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
-    my @row = ();
+  my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}], noindexes => 1 );
+  my @sorted_vals;
+  foreach my $key (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results){
     foreach my $ind ( @{$attr->{columns}}){
-      if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
-        $results->{$var}->{$ind} =~ s/"|\n//g;
-        my @in_hex = split(/ /, $results->{$var}->{$ind});
+      if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$key}->{$ind} ){
+        $results->{$key}->{$ind} =~ s/"|\n//g;
+        my @in_hex = split(/ /, $results->{$key}->{$ind});
         my $index='';
         foreach my $hex (@in_hex){
           $index .= sprintf( "%08b", hex($hex));
         }
-        $results->{$var}->{$ind} = '';
+        $results->{$key}->{$ind} = '';
         my $offset = 0;
         my $result = index($index, 1, $offset);
         while ($result != - 1) {
           $result = index($index, 1, $offset);
           $offset = $result + 1;
-          $results->{$var}->{$ind} .= "$offset " if ( $offset > 0 );
+          $results->{$key}->{$ind} .= "$offset " if ( $offset > 0 );
         }
       }
-      if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress' && $SNMP::MIB{$ind}{syntax} ne ''){
-        $results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
+      if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress' && $results->{$key}->{$ind}){
+        $results->{$key}->{$ind} = _mac_former($results->{$key}->{$ind});
       }
-      push @row,  $results->{$var}->{$ind};
     }
-    if ( $row[1]) {
-      $table->addrow(@row);
-    }
+    push @sorted_vals, $results->{$key}
+  }
+  
+  if ( $sess->{ErrorNum} ) {
+    return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
 
-  return $table->show();
-}
+  return simple_table({ data => \@sorted_vals, id => $attr->{OID} }, { SW => 1, FOOT => 1 });
+ }
 
 #**********************************************************
 
@@ -547,7 +519,7 @@ sub nms_show {
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
-  if ($attr->{EDIT}){
+  if ($attr->{EDIT} == 0){
     my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : 'scalar';
     my $button = $html->button( $lang{ADD}, undef, {
       JAVASCRIPT     => '',
@@ -573,26 +545,18 @@ sub mibs_browser {
 
   my ($attr) = @_;
 
-  $pages_qs = ($attr->{ID}) ? "&ID=$attr->{ID}" : q{};
+  my $obj;
   my $root_index = get_function_index('mibs_browser');
   my $mods_index = get_function_index('modules_table');
-  my $nms = $Nms->obj_list({ 
-    COLS_NAME => 1,
-    IP => '_SHOW',
-    ID => $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW},
-    SYS_OBJECTID => '_SHOW'
-  });
+  my $ID = $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW} || 0 ;
+  $pages_qs = $pages_qs . "&ID=$ID";
   
-  my $OBJECTID = $FORM{OBJECTID} || $nms->[0]->{sysobjectid};
-
-  my $ID = $nms->[0]->{id};
-
   if ($FORM{OID}){
-    load_mibs({ OBJECTID => $OBJECTID });
-    print nms_show({ OID => $FORM{OID}, EDIT => 1 });
+    $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
+    print nms_show({ OID => $FORM{OID}, EDIT => $ID });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
-      my $sess = SNMP::Session->new(DestHost => $nms->[0]->{ip}, %snmpparms);
+      my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
       my $iid = $attr->{IID} || 0;
       my $result = $sess->get([ $FORM{OID}, $iid ]);
       if ( $sess->{ErrorNum} ) {
@@ -603,7 +567,7 @@ sub mibs_browser {
       print $result_tbl->show();
     } 
     elsif ($FORM{WALK}){
-      my $sess = SNMP::Session->new(DestHost => $nms->[0]->{ip}, %snmpparms);
+      my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
       my @result = $sess->bulkwalk(0, 1,[ $FORM{OID} ]);
       if ( $sess->{ErrorNum} ) {
         return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
@@ -620,13 +584,16 @@ sub mibs_browser {
       print $result_tbl->show();
     } 
     elsif ($FORM{TABLE}){
-      print nms_snmp_table({ IP => $nms->[0]->{ip}, OID => $FORM{OID}});
+      print nms_snmp_table({ IP => $obj->{ip}, OID => $FORM{OID}});
     } 
     elsif ($FORM{SET}){
-      nms_snmp_set({ IP => $nms->[0]->{ip}, OID => $FORM{OID}});
+      nms_snmp_set({ IP => $obj->{ip}, OID => $FORM{OID}});
     }
     return 1;
   }
+
+  $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
+  my $OBJECTID = $FORM{OBJECTID} || $obj->{sysobjectid};
 
   my $res = $html->element('div', '',
                 { 
@@ -1186,10 +1153,14 @@ sub oids_set {
     print $id_num->{INSERT_ID};
     return $id_num->{INSERT_ID};
   }
-  my @header_arr = ("$lang{MAIN}:index=$index&visual=INFO&OBJECTID=$FORM{OBJECTID}$pages_qs");
-  foreach my $val (sort keys %$heads){
-    push @header_arr, uc($val).":index=$index&OBJECTID=$FORM{OBJECTID}&visual=$val$pages_qs";
-  };
+  my @header_arr = (
+    "$lang{MAIN}:index=$index&visual=INFO&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "TABLE:index=$index&visual=TABLE&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "SCALAR:index=$index&visual=SCALAR&OBJECTID=$FORM{OBJECTID}$pages_qs"
+  );
+#  foreach my $val (sort keys %$heads){
+#    push @header_arr, uc($val).":index=$index&OBJECTID=$FORM{OBJECTID}&visual=$val$pages_qs";
+#  };
   my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
   print $html->element('div', $buttons, { class => 'navbar navbar-default' });
   my $visual = $FORM{visual} || 'INFO';
@@ -1354,6 +1325,93 @@ sub oid_table_row_edit {
          </script>
          );
   print $scr;
+  return 1;
+}
+
+#**********************************************************
+=head2 simple_table($data,$attr); - return formated text with label
+
+  Arguments:
+    $data - 
+           data - list of hash's
+           columns - list of columns for table
+           id - table id
+    $attr - hash of extended attributes https://datatables.net/examples/api
+      
+  Returns:
+    String with element
+
+=cut
+#**********************************************************
+sub simple_table {
+  my ($attr,$ext) = @_;
+  my $ID = ($attr->{id})? "#$attr->{id}"."_adv" : "table.table";
+  my $result;
+  $attr->{lengthMenu} = ($ext->{SW})?[[28, 52, -1],[28, 52, $lang{ALL}]]:[[25, 50, -1],[25, 50, $lang{ALL}]];
+  $attr->{language} = {
+    paginate     => { first => '«', previous => '‹', next => '›', last => '»'},
+    zeroRecords  => $lang{NOT_EXIST},
+    lengthMenu   => "$lang{SHOW} _MENU_",
+    search       => "$lang{SEARCH}:",
+    info         => "$lang{SHOWING} _START_ - _END_ $lang{OF} _TOTAL_ ",
+    infoEmpty    => "$lang{SHOWING} 0",
+    infoFiltered => "($lang{TOTAL} _MAX_)"
+  };
+
+  if ($attr->{data}){
+    my @data_colls = ($attr->{columns}) ? $attr->{columns} : sort keys %{$attr->{data}->[0]};
+    my @cols;
+    my @ajcols;
+    foreach my $col ( @data_colls ) {
+      push @cols, $html->element('th', $col);
+      push @{$attr->{columns}}, {data => $col} ;
+    }
+    my $tbody = $html->element('thead', "<tr>@cols</tr>");
+    $tbody .= $html->element('tfoot', "<tr>@cols</tr>") if $ext->{FOOT};
+    my $table = $html->element('table', $tbody, {
+      id => $attr->{id}."_adv",
+      class => 'table row-border hover order-column',
+      cellspacing => 0,
+      width => '100%'
+    });
+    $result.= $table;
+  }
+  my $ATTR = ($attr)? JSON->new->indent->encode($attr) : '';
+
+  $result .= qq(
+    <link rel='stylesheet' type='text/css' href='/styles/lte_adm/plugins/datatables/jquery.dataTables_themeroller.css'>
+    <script>
+      jQuery(function () {
+        jQuery('$ID').DataTable($ATTR);
+      });
+    </script>
+  );
+
+  return $result;
+}
+
+#**********************************************************
+
+=head2 sysobjectid_table()
+
+=cut
+
+#**********************************************************
+sub sysobjectid_table1 {
+
+  my ($attr) = @_;
+  my $nms = $Nms->obj_list({ 
+    IP    => '_SHOW',
+    NAS_NAME => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    SYS_LOCATION => '_SHOW',
+    COLS_NAME => 1,
+    %LIST_PARAMS,
+  });
+
+
+  print simple_table({ data => \@$nms, id => 'sys' });
+
   return 1;
 }
 
