@@ -263,16 +263,16 @@ sub nms_obj {
       },
       SELECT_VALUE    => { sysobjectid => \%$oid_hash },
       TABLE => {
-        caption => " ",
-        qs      => $pages_qs,
-        ID      => 'OBJ_LIST',
+        caption    => " ",
+        qs         => $pages_qs,
+        ID         => 'OBJ_LIST',
+        DATA_TABLE => ($attr->{STATUS})? 0 : 1
       },
       MAKE_ROWS       => 1,
       SKIP_USER_TITLE => 1,
       SKIP_PAGES      => 1,
-      TOTAL           => 1
+      TOTAL           => 1,
     });
-    print simple_table() if !$attr->{STATUS};
   }
   return 1;
 }
@@ -1336,7 +1336,7 @@ sub oid_table_row_edit {
            data - list of hash's
            columns - list of columns for table
            id - table id
-    $attr - hash of extended attributes https://datatables.net/examples/api
+    $ext - hash of extended attributes https://datatables.net/examples/api
       
   Returns:
     String with element
@@ -1347,15 +1347,9 @@ sub simple_table {
   my ($attr,$ext) = @_;
   my $ID = ($attr->{id})? "#$attr->{id}"."_adv" : "table.table";
   my $result;
-  $attr->{lengthMenu} = ($ext->{SW})?[[28, 52, -1],[28, 52, $lang{ALL}]]:[[25, 50, -1],[25, 50, $lang{ALL}]];
+  $attr->{lengthMenu} = [[28, 52, -1],[28, 52, $lang{ALL}]] if $ext->{SW};
   $attr->{language} = {
-    paginate     => { first => '«', previous => '‹', next => '›', last => '»'},
-    zeroRecords  => $lang{NOT_EXIST},
-    lengthMenu   => "$lang{SHOW} _MENU_",
-    search       => "$lang{SEARCH}:",
-    info         => "$lang{SHOWING} _START_ - _END_ $lang{OF} _TOTAL_ ",
-    infoEmpty    => "$lang{SHOWING} 0",
-    infoFiltered => "($lang{TOTAL} _MAX_)"
+    url => "/styles/lte_adm/plugins/datatables/lang/" . $html->{content_language} . ".json"
   };
 
   if ($attr->{data}){
@@ -1366,8 +1360,8 @@ sub simple_table {
       push @cols, $html->element('th', $col);
       push @{$attr->{columns}}, {data => $col} ;
     }
-    my $tbody = $html->element('thead', "<tr>@cols</tr>");
-    $tbody .= $html->element('tfoot', "<tr>@cols</tr>") if $ext->{FOOT};
+    my $tbody = $html->element('thead', $html->element('tr', "@cols" ));
+    $tbody .= $html->element('tfoot', $html->element('tr', "@cols" )) if $ext->{FOOT};
     my $table = $html->element('table', $tbody, {
       id => $attr->{id}."_adv",
       class => 'table row-border hover order-column',
@@ -1388,31 +1382,6 @@ sub simple_table {
   );
 
   return $result;
-}
-
-#**********************************************************
-
-=head2 sysobjectid_table()
-
-=cut
-
-#**********************************************************
-sub sysobjectid_table1 {
-
-  my ($attr) = @_;
-  my $nms = $Nms->obj_list({ 
-    IP    => '_SHOW',
-    NAS_NAME => '_SHOW',
-    SYS_OBJECTID => '_SHOW',
-    SYS_LOCATION => '_SHOW',
-    COLS_NAME => 1,
-    %LIST_PARAMS,
-  });
-
-
-  print simple_table({ data => \@$nms, id => 'sys' });
-
-  return 1;
 }
 
 1;
