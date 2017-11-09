@@ -505,6 +505,80 @@ sub module_del {
   return $self;
 }
 
+#**********************************************************
+=head2 triggers_list($attr)
+
+=cut
+#**********************************************************
+sub triggers_list {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
+  $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : 'DESC';
+  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
+  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 10000;
+
+  my $WHERE =  $self->search_former($attr, [
+    ['OBJ_ID',   'INT', 'obj_id',   1 ],
+    ['LABEL',    'STR', 'label',    1 ],
+    ['IID',      'INT', 'iid',      1 ],
+    ['TYPE',     'STR', 'objectid', 1 ],
+    ['MONIT',    'INT', 'monit',    1 ],
+    ['SYS_NAME', 'STR', 'sysname',  1 ],
+    ],
+    { WHERE => 1,
+    }
+  );
+
+  $self->query2("SELECT $self->{SEARCH_FIELDS} tr.id AS id
+    FROM nms_obj_triggers tr
+    LEFT JOIN nms_obj n ON (n.id=obj_id)
+    $WHERE
+    ORDER BY $SORT $DESC
+    LIMIT $PG, $PAGE_ROWS;",
+    undef,
+    $attr
+  );
+
+  my $list = $self->{list};
+  $self->query2("SELECT COUNT(*) AS total
+    FROM nms_obj_triggers
+    $WHERE;",
+    undef,
+    { INFO => 1 }
+  );  
+  return $self->{list_hash} if ($attr->{LIST2HASH});
+
+  return $list;
+}
+
+#**********************************************************
+# triggers_add()
+#**********************************************************
+sub trigger_add {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query_add('nms_obj_triggers', $attr, { REPLACE => 1 });
+
+  return $self;
+}
+
+#**********************************************************
+=head2 triggers($id)
+
+=cut
+#**********************************************************
+sub trigger_del {
+  my $self = shift;
+  my ($id) = @_;
+
+  $self->query_del('nms_obj_triggers', { ID => $id });
+ 
+  return $self;
+}
+
 
 
 1;

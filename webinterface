@@ -235,7 +235,7 @@ sub nms_obj {
       nms_obj_data({ ID => $FORM{ID}});
     } 
     elsif ($visual eq 'STATS') {
-      nms_snmp_stats({ NAS_ID => $FORM{ID} });
+      nms_snmp_stats({ ID => $FORM{ID} });
     } 
     elsif ($visual eq 'MIB_BR') {
       mibs_browser({ ID => $FORM{ID} });
@@ -493,7 +493,7 @@ sub nms_snmp_table {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
 
-  return simple_table({ data => \@sorted_vals, id => $attr->{OID} }, { SW => 1, FOOT => 1 });
+  return simple_table({ data => \@sorted_vals }, { SW => 1, , id => $attr->{OID} });
  }
 
 #**********************************************************
@@ -659,14 +659,14 @@ sub nms_snmp_stats {
           encoding => undef,
   );
 
-  my $stats = $Equipment->graph_list({
-    COLS_NAME => 1,
-    OBJ_ID    => $attr->{ID} || $FORM{ID},
-    PORT      => $attr->{PORT} || '_SHOW',
-    PARAM     => '_SHOW',
-    TYPE      => '_SHOW',
-    NAME      => '_SHOW',
-  });
+  my $stats = $Nms->triggers_list({
+      COLS_NAME => 1,
+      OBJ_ID    => $attr->{ID},
+      LABEL     => '_SHOW',
+      IID       => '_SHOW',
+      MONIT     => '_SHOW',
+      SYS_NAME  => '_SHOW',
+    });
   return 1 if !$stats;
 
   my $to_date = time;
@@ -683,14 +683,14 @@ sub nms_snmp_stats {
   my %ind;
   my %params;
   foreach my $key ( @$stats ) {
-    my @list = $redis->zrangebyscore("$key->{obj_id}:$key->{port}:$key->{param}", $from_date, $to_date, 'WITHSCORES' );
+    my @list = $redis->zrangebyscore("$key->{id}", $from_date, $to_date, 'WITHSCORES' );
     foreach my $val ( 0..@list-2 ) {
       if ( $val%2 == 1 ){
         my $value = sprintf("%.2f", ($list[$val+1] - $list[$val-1]) / ($list[$val+2] - $list[$val]) / 1048576 * 8);
-        push  @{$ind{$key->{port}}}, ({ $key->{name} => $value, y => strftime("%Y-%m-%d %T", localtime($list[$val])) });
+        push  @{$ind{$key->{iid}}}, ({ $key->{label} => $value, y => strftime("%Y-%m-%d %T", localtime($list[$val])) });
       }
     }
-    push  @{$params{$key->{port}}}, $key->{name};
+    push  @{$params{$key->{iid}}}, $key->{label};
   };
 
   my $PORT_SEL = $html->form_select(
@@ -702,23 +702,32 @@ sub nms_snmp_stats {
     }
   );
 
-  print $html->form_main(
-    {
-      CONTENT => "$lang{PERIOD}: $lang{FROM} &nbsp" . $html->form_datetimepicker2('FROM_DATE') .
-    "&nbsp $lang{TO} &nbsp" . $html->form_datetimepicker2('TO_DATE') .
-    "&nbsp $lang{PORT}: " . $PORT_SEL . $html->form_input('SHOW', $lang{SHOW}, { TYPE => 'SUBMIT' }),
-      METHOD  => 'GET',
-      class   => 'form-inline',
-      HIDDEN  => {
-        index  => "$index",
-        visual => 'STATS',
-        ID => $attr->{ID} || $FORM{ID},
-      },
-    }
-  );
+  if (!$attr->{MONIT}){
+    print $html->form_main(
+      {
+        CONTENT => "$lang{PERIOD}: $lang{FROM} &nbsp" . $html->form_datetimepicker2('FROM_DATE') .
+      "&nbsp $lang{TO} &nbsp" . $html->form_datetimepicker2('TO_DATE') .
+      "&nbsp $lang{PORT}: " . $PORT_SEL . $html->form_input('SHOW', $lang{SHOW}, { TYPE => 'SUBMIT' }),
+        METHOD  => 'GET',
+        class   => 'form-inline',
+        HIDDEN  => {
+          index  => "$index",
+          visual => 'STATS',
+          ID => $attr->{ID} || $FORM{ID},
+        },
+      }
+    );    
+  }
 
   foreach my $in (sort { $a <=> $b } keys %ind) {
-    print $html->make_charts3({DATA => \@{$ind{$in}}, XKEYS => \@{$params{$in}}, LABELS => \@{$params{$in}}, GRAPH_ID => $in, UNITS => 'Mb/s', HEADER => "$lang{PORT} $in" });
+    print $html->make_charts3({
+      DATA     => \@{$ind{$in}},
+      XKEYS    => \@{$params{$in}},
+      LABELS   => \@{$params{$in}},
+      GRAPH_ID => $in,
+      UNITS    => 'Mb/s',
+      HEADER   => "$stats->[0]->{sysname}: $lang{PORT} $in"
+    });
   }
 
   return 1;
@@ -1104,19 +1113,22 @@ sub make_tree {
 sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
-  print $html->element('div', nms_obj({ STATUS => 1 }), { ID => 'OBJ' });
-  print $html->element('div', nms_traps({ PAGE_ROWS => 10 }), { ID => 'TRAPS' });
+  my $obj = nms_obj({ STATUS => 1 });
+  if ($obj eq 1) {
+    nms_snmp_stats({ MONIT => 1 });
+  }
+  print $html->element('div', nms_traps({ PAGE_ROWS => 10 }), { ID => 'TRAPS_MON' });
 
   my $scr = qq(
   <script type="text/javascript">
      var autoLoad = setInterval(
      function ()
      {
-        jQuery('#TRAPS').load('?get_index=nms_traps').fadeIn('slow');
+        jQuery('#TRAPS_MON').load('?get_index=nms_traps').fadeIn('slow');
      }, 10000); // refresh page every 10 seconds
   </script>
   );
-  #print $scr;
+  print $scr;
 
   return 1;
 }
@@ -1332,7 +1344,7 @@ sub oid_table_row_edit {
 =head2 simple_table($data,$attr); - return formated text with label
 
   Arguments:
-    $data - 
+    $attr - 
            data - list of hash's
            columns - list of columns for table
            id - table id
@@ -1345,13 +1357,12 @@ sub oid_table_row_edit {
 #**********************************************************
 sub simple_table {
   my ($attr,$ext) = @_;
-  my $ID = ($attr->{id})? "#$attr->{id}"."_adv" : "table.table";
+  my $ID = ($ext->{id})? "#$ext->{id}"."_adv" : "table.table";
   my $result;
   $attr->{lengthMenu} = [[28, 52, -1],[28, 52, $lang{ALL}]] if $ext->{SW};
   $attr->{language} = {
     url => "/styles/lte_adm/plugins/datatables/lang/" . $html->{content_language} . ".json"
   };
-
   if ($attr->{data}){
     my @data_colls = ($attr->{columns}) ? $attr->{columns} : sort keys %{$attr->{data}->[0]};
     my @cols;
@@ -1360,10 +1371,11 @@ sub simple_table {
       push @cols, $html->element('th', $col);
       push @{$attr->{columns}}, {data => $col} ;
     }
+    push @cols, $html->element('th', 'Action') if $attr->{columnDefs};
     my $tbody = $html->element('thead', $html->element('tr', "@cols" ));
     $tbody .= $html->element('tfoot', $html->element('tr', "@cols" )) if $ext->{FOOT};
     my $table = $html->element('table', $tbody, {
-      id => $attr->{id}."_adv",
+      id => $ext->{id}."_adv",
       class => 'table row-border hover order-column',
       cellspacing => 0,
       width => '100%'
@@ -1373,11 +1385,8 @@ sub simple_table {
   my $ATTR = ($attr)? JSON->new->indent->encode($attr) : '';
 
   $result .= qq(
-    <link rel='stylesheet' type='text/css' href='/styles/lte_adm/plugins/datatables/jquery.dataTables_themeroller.css'>
     <script>
-      jQuery(function () {
-        jQuery('$ID').DataTable($ATTR);
-      });
+      var table = jQuery('$ID').DataTable($ATTR);
     </script>
   );
 

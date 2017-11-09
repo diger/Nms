@@ -10,7 +10,7 @@ use strict;
 use warnings FATAL => 'all';
 use Abills::Base qw(ip2int mk_unique_value);
 use Dv;
-use Cid_auth;
+#use Cid_auth;
 use Dhcphosts;
 
 our(

@@ -60,7 +60,7 @@ sub nms_traps {
         my %en = oid_enums($val->[1]);
         $val->[2] = $en{$val->[2]};
       }
-      my $rows = $html->element('div', "<label>$SNMP::MIB{$val->[1]}{label}</label>", {class => 'col-sm-6', title => $val->[1]});
+      my $rows = $html->element('div', $html->element('label', $SNMP::MIB{$val->[1]}{label}), {class => 'col-sm-6', title => $val->[1]});
       $rows .= $html->element('div', $SNMP::MIB{$val->[2]}{label} || $val->[2], {class => 'col-sm-6', title => $val->[2]});
       print $html->element('div', $rows,{class => 'row'});
     }
@@ -68,7 +68,7 @@ sub nms_traps {
     return 1
   }
   
-  result_former({
+  my ($table) = result_former({
     INPUT_DATA      => $Traps,
     FUNCTION        => 'traps_list',
     DEFAULT_FIELDS  => 'TRAPTIME, IP, LABEL, TIMETICKS',
@@ -90,10 +90,10 @@ sub nms_traps {
       caption => "$lang{TRAPS}",
       header  => $html->button( "$lang{CONFIG} $lang{TRAPS}", "index=".get_function_index( 'nms_trap_types' ), { class => 'change' } ),
       qs      => ($FORM{NAS_ID})? "$pages_qs&NAS_ID=$FORM{NAS_ID}" : $pages_qs,
-      ID      => 'TRAPS_LIST',
+      ID      => 'NMS_TRAPS_LIST',
     },
-    MAKE_ROWS => 1,
-    TOTAL     => 1,
+    MAKE_ROWS     => 1,
+    TOTAL         => 1,
   });
   my $scr = qq(
     <script>
@@ -104,7 +104,7 @@ sub nms_traps {
     </script>
   );
   print $scr;
-  return 1
+  return $table->show();
 }
 
 #********************************************************

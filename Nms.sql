@@ -1,4 +1,3 @@
-
 CREATE TABLE `nms_obj` (
   `id` smallint(6) unsigned NOT NULL AUTO_INCREMENT,
   `ip` int(11) unsigned NOT NULL DEFAULT '0',
@@ -11,7 +10,6 @@ CREATE TABLE `nms_obj` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `ip_sys` (`ip`,`sysobjectid`)
 ) COMMENT='Equipment objects';
-
 
 
 CREATE TABLE `nms_oids` (
@@ -29,7 +27,6 @@ CREATE TABLE `nms_oids` (
 ) COMMENT='Equipment OIDS table';
 
 
-
 CREATE TABLE `nms_oids_rows` (
   `id` smallint(4) unsigned NOT NULL,
   `label` varchar(50) NOT NULL DEFAULT '',
@@ -43,14 +40,12 @@ CREATE TABLE `nms_oids_rows` (
 ) COMMENT='Equipment OIDS table rows';
 
 
-
 CREATE TABLE `nms_sysobjectid` (
   `objectid` varchar(50) NOT NULL,
   `label` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`objectid`),
   UNIQUE KEY `obj_label` (`objectid`,`label`)
 ) COMMENT='Nms sysobjects table';
-
 
 
 CREATE TABLE `nms_trap_values` (
@@ -60,7 +55,6 @@ CREATE TABLE `nms_trap_values` (
   KEY `id` (`id`),
   CONSTRAINT `nms_trap_values_ibfk_1` FOREIGN KEY (`id`) REFERENCES `nms_traps` (`id`) ON DELETE CASCADE
 ) COMMENT='Nms trap values';
-
 
 
 CREATE TABLE `nms_traps` (
@@ -74,11 +68,26 @@ CREATE TABLE `nms_traps` (
 ) COMMENT='Nms traps';
 
 
-
 CREATE TABLE `nms_vendors` (
   `id` smallint(6) unsigned NOT NULL,
   `name` varchar(200) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
 ) COMMENT='NMS vendors list';
+
+
+CREATE TABLE `nms_obj_triggers` (
+  `id` smallint(4) unsigned NOT NULL AUTO_INCREMENT,
+  `obj_id` smallint(5) unsigned NOT NULL,
+  `label` varchar(50) NOT NULL DEFAULT '',
+  `iid` smallint(5) unsigned DEFAULT NULL,
+  `type` varchar(50) DEFAULT NULL,
+  `min_value` int(11) DEFAULT NULL,
+  `max_value` int(11) DEFAULT NULL,
+  `monit` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `lab_i_obj` (`label`,`iid`,`obj_id`),
+  KEY `obj_id` (`obj_id`),
+  CONSTRAINT `nms_obj_triggers_ibfk_1` FOREIGN KEY (`obj_id`) REFERENCES `nms_obj` (`id`) ON DELETE CASCADE
+) COMMENT='Nms object triggers'
 
 
