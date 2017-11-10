@@ -110,56 +110,15 @@ sub obj_add {
 }
 
 #**********************************************************
-=head2 obj_values_list($attr)
+=head2 oid_del($id)
 
 =cut
 #**********************************************************
-sub obj_values_list {
+sub obj_del {
   my $self = shift;
-  my ($attr) = @_;
+  my ($id) = @_;
 
-  $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
-  $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : '';
-  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
-  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 50;
-
-  my $WHERE =  $self->search_former($attr, [
-      ['OBJ_ID', 'INT', 'obj_id',  1 ],
-      ['OBJ_IND','INT', 'obj_ind', 1 ],
-	  ['OID_ID', 'STR', 'oid_id',  1 ],
-	  ['VALUE',  'STR', 'value',   1 ],
-    ],
-    { WHERE => 1,
-    }
-  );
-
-  $self->query2("SELECT $self->{SEARCH_FIELDS} obj_id
-    FROM nms_obj_values
-    $WHERE
-    ORDER BY $SORT $DESC
-    LIMIT $PG, $PAGE_ROWS;",
-    undef,
-    $attr
-  );
-
-  my $list = $self->{list};
-  
-  return $self->{list_hash} if ($attr->{LIST2HASH});
-
-  return $list;
-}
-
-#**********************************************************
-# obj_values_add()
-#**********************************************************
-sub obj_values_add {
-  my $self = shift;
-  my ($attr) = @_;
-
-  $self->query2("INSERT INTO nms_obj_values (obj_id, oid_id, obj_ind, value) VALUES
-				('$attr->{OBJ_ID}', '$attr->{OID_ID}', '$attr->{OBJ_IND}', '$attr->{VALUE}')
-				ON DUPLICATE KEY UPDATE value='$attr->{VALUE}'", 'do'
-				);
+  $self->query_del('nms_obj', { ID => $id });
 
   return $self;
 }
@@ -576,6 +535,20 @@ sub trigger_del {
 
   $self->query_del('nms_obj_triggers', { ID => $id });
  
+  return $self;
+}
+
+#**********************************************************
+=head2 change_obj_status()
+
+=cut
+#**********************************************************
+sub change_obj_status {
+  my $self = shift;
+  my ($attr) = @_;
+  
+  $self->query2("UPDATE nms_obj SET status='$attr->{STATUS}' WHERE id='$attr->{ID}'", 'do');
+
   return $self;
 }
 

@@ -43,8 +43,8 @@ sub nms_traps {
     }
     $LIST_PARAMS{oid} = join(",", @alerts_arr);
   }
-  if ($attr->{PAGE_ROWS}){
-	  $LIST_PARAMS{PAGE_ROWS} = $attr->{PAGE_ROWS};
+  if ($attr->{PAGE_ROWS} || $FORM{PAGE_ROWS}){
+	  $LIST_PARAMS{PAGE_ROWS} = $attr->{PAGE_ROWS} || $FORM{PAGE_ROWS};
 	  $LIST_PARAMS{MONIT} = 1;
   }
   if ($FORM{NAS_ID}){
@@ -68,7 +68,7 @@ sub nms_traps {
     return 1
   }
   
-  my ($table) = result_former({
+  my ($table,$list) = result_former({
     INPUT_DATA      => $Traps,
     FUNCTION        => 'traps_list',
     DEFAULT_FIELDS  => 'TRAPTIME, IP, LABEL, TIMETICKS',
@@ -94,17 +94,27 @@ sub nms_traps {
     },
     MAKE_ROWS     => 1,
     TOTAL         => 1,
+    OUTPUT2RETURN => 1
   });
+  
+  if ($attr->{MONIT}){
+    return simple_table({
+      data      => \@$list,
+      orderable => undef,
+      searching => undef,
+      paging    => undef,
+    }, { id => 'NMS_TRAPS_LIST' });
+  }
   my $scr = qq(
     <script>
-    \$('a#trap').on('click', function(){
-      //loadDataToModal(this.innerText);
-      loadToModal('?get_index=nms_traps&header=2&ID=' + this.getAttribute('value'))
+    jQuery('a#trap').on('click', function(){
+       loadToModal('?get_index=nms_traps&header=2&ID=' + this.getAttribute('value'))
     })
     </script>
   );
-  print $scr;
-  return $table->show();
+  print $table.$scr;
+
+  return 1
 }
 
 #********************************************************

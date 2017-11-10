@@ -158,6 +158,9 @@ sub nms_obj {
   my ($attr) = @_;
   $pages_qs .= ($FORM{ID}) ? "&ID=$FORM{ID}" : q{};
   $LIST_PARAMS{SORT} = $FORM{sort} || 1;
+  if ($FORM{del}){
+    $Nms->obj_del($FORM{del})
+  }
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
   my $nms = $Nms->obj_list({
       IP           => $FORM{IP} || '_SHOW',
@@ -245,13 +248,13 @@ sub nms_obj {
     }
   }
   elsif ($Nms->{TOTAL} != 0) {
-    result_former({
+    my ($table) = result_former({
       INPUT_DATA      => $Nms,
       LIST            => $nms,
       BASE_FIELDS     => 1,
       DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID, STATUS',
       HIDDEN_FIELDS   => 'NAS_ID,ID',
-#     FUNCTION_FIELDS => 'equipment_traps:change:trap_id;&pg='.($FORM{pg}||''),
+      FUNCTION_FIELDS => 'change,del',
       EXT_TITLES      => {
         ip       => 'IP',
         name     => "$lang{NAME} NAS",
@@ -266,15 +269,20 @@ sub nms_obj {
         caption    => " ",
         qs         => $pages_qs,
         ID         => 'OBJ_LIST',
-        DATA_TABLE => ($attr->{STATUS})? 0 : 1
+        DATA_TABLE => {
+          lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
+          ordering   => undef
+        }
       },
       MAKE_ROWS       => 1,
       SKIP_USER_TITLE => 1,
       SKIP_PAGES      => 1,
       TOTAL           => 1,
+      OUTPUT2RETURN   => 1
     });
+    print $table;
   }
-  return 1;
+  return $Nms->{TOTAL};
 }
 
 #**********************************************************
@@ -456,16 +464,22 @@ sub nms_snmp_table {
 #  $snmpparms{Timeout} = 10000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
+  my @columns;
   if (!$attr->{columns}){
       foreach my $c (sort { $a <=> $b } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
-      push @{$attr->{columns}}, $c->{'label'};
+      push @columns, {data => $c->{label}};
+      push @{$attr->{columns}}, $c->{label}
       }
   }
-
+  else {
+    foreach my $c ( @{$attr->{columns}} ){
+      push @columns, { data => $c };
+    }
+  }
   my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}], noindexes => 1 );
   my @sorted_vals;
   foreach my $key (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results){
-    foreach my $ind ( @{$attr->{columns}}){
+    foreach my $ind ( @{$attr->{columns}} ){
       if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$key}->{$ind} ){
         $results->{$key}->{$ind} =~ s/"|\n//g;
         my @in_hex = split(/ /, $results->{$key}->{$ind});
@@ -493,7 +507,14 @@ sub nms_snmp_table {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
 
-  return simple_table({ data => \@sorted_vals }, { SW => 1, , id => $attr->{OID} });
+  my $table =  $html->table({
+    ID         => $attr->{OID},
+    DATA_TABLE => {
+      data    => \@sorted_vals,
+      columns => \@columns
+    }
+  });
+  return $table->show()
  }
 
 #**********************************************************
@@ -1114,21 +1135,25 @@ sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
   my $obj = nms_obj({ STATUS => 1 });
-  if ($obj eq 1) {
+  if ($obj == 0) {
     nms_snmp_stats({ MONIT => 1 });
   }
-  print $html->element('div', nms_traps({ PAGE_ROWS => 10 }), { ID => 'TRAPS_MON' });
+  print nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
 
   my $scr = qq(
   <script type="text/javascript">
-     var autoLoad = setInterval(
-     function ()
-     {
-        jQuery('#TRAPS_MON').load('?get_index=nms_traps').fadeIn('slow');
-     }, 10000); // refresh page every 10 seconds
+    var table = jQuery('#NMS_TRAPS_LIST_').DataTable( {
+      ajax: "index.cgi?get_index=nms_traps&sort=1&EXPORT_CONTENT=NMS_TRAPS_LIST&header=1&json=1&PAGE_ROWS=10",
+      orderable: false,
+      serverSide: true,
+    } );
+ 
+    setInterval( function () {
+      table.ajax.reload( null, false ); // user paging is not reset on reload
+    }, 30000 );
   </script>
   );
-  print $scr;
+ # print $scr;
 
   return 1;
 }
@@ -1338,59 +1363,6 @@ sub oid_table_row_edit {
          );
   print $scr;
   return 1;
-}
-
-#**********************************************************
-=head2 simple_table($data,$attr); - return formated text with label
-
-  Arguments:
-    $attr - 
-           data - list of hash's
-           columns - list of columns for table
-           id - table id
-    $ext - hash of extended attributes https://datatables.net/examples/api
-      
-  Returns:
-    String with element
-
-=cut
-#**********************************************************
-sub simple_table {
-  my ($attr,$ext) = @_;
-  my $ID = ($ext->{id})? "#$ext->{id}"."_adv" : "table.table";
-  my $result;
-  $attr->{lengthMenu} = [[28, 52, -1],[28, 52, $lang{ALL}]] if $ext->{SW};
-  $attr->{language} = {
-    url => "/styles/lte_adm/plugins/datatables/lang/" . $html->{content_language} . ".json"
-  };
-  if ($attr->{data}){
-    my @data_colls = ($attr->{columns}) ? $attr->{columns} : sort keys %{$attr->{data}->[0]};
-    my @cols;
-    my @ajcols;
-    foreach my $col ( @data_colls ) {
-      push @cols, $html->element('th', $col);
-      push @{$attr->{columns}}, {data => $col} ;
-    }
-    push @cols, $html->element('th', 'Action') if $attr->{columnDefs};
-    my $tbody = $html->element('thead', $html->element('tr', "@cols" ));
-    $tbody .= $html->element('tfoot', $html->element('tr', "@cols" )) if $ext->{FOOT};
-    my $table = $html->element('table', $tbody, {
-      id => $ext->{id}."_adv",
-      class => 'table row-border hover order-column',
-      cellspacing => 0,
-      width => '100%'
-    });
-    $result.= $table;
-  }
-  my $ATTR = ($attr)? JSON->new->indent->encode($attr) : '';
-
-  $result .= qq(
-    <script>
-      var table = jQuery('$ID').DataTable($ATTR);
-    </script>
-  );
-
-  return $result;
 }
 
 1;

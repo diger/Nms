@@ -217,7 +217,7 @@ sub stats {
 }
 
 #**********************************************************
-=head2 ping($attr)
+=head2 nms_ping($attr)
 
 =cut
 #********************************************************** 
@@ -244,28 +244,31 @@ sub nms_ping {
     my $vb = new SNMP::Varbind(['sysUpTime']);
 
     # The responses to our queries are stored in %list.
-    $var = $sess->getnext($vb, [ \&gotit, $obj->{ip}, \%list ]);
+    $var = $sess->getnext($vb, [ \&gotit, $obj->{id}, \%list ]);
 
     # Update the rate limiting counter.
     $id++;
 
     # After every 100 IP's, wait for the timeout period (default is two seconds) to keep from overwhelming routers with ARP queries.
-    if ( $id > 100 ) {
+#    if ( $id > 100 ) {
       &SNMP::MainLoop(2);
-      $id = 0;
-    }
+#      $id = 0;
+#    }
   }
-
-print Dumper \%list;
 }
 
 sub gotit{
-  my $myip = shift;
+  my $id = shift;
   my $listref = shift;
   my $vl = shift;
   if ( defined $$vl[0] ) {
-#    &SNMP::finish();;
-    $$listref{$myip}{desc} = $$vl[0]->val;
+    &SNMP::finish();
+    $Nms->change_obj_status({ ID => $id, STATUS => 0 });
+    print "$id Ok \n" if $debug > 1;
+#    $$listref{$id}{desc} = $$vl[0]->val;
+  } else {
+    $Nms->change_obj_status({ ID => $id, STATUS => 1 });
+    print "$id fall \n" if $debug > 1;
   }
   return();
 }
