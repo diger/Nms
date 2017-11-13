@@ -91,20 +91,17 @@ sub nms_traps {
       header  => $html->button( "$lang{CONFIG} $lang{TRAPS}", "index=".get_function_index( 'nms_trap_types' ), { class => 'change' } ),
       qs      => ($FORM{NAS_ID})? "$pages_qs&NAS_ID=$FORM{NAS_ID}" : $pages_qs,
       ID      => 'NMS_TRAPS_LIST',
+      DATA_TABLE => ($attr->{MONIT})?{
+        orderable => undef,
+        searching => undef,
+        paging    => undef,
+      } : undef
     },
     MAKE_ROWS     => 1,
-    TOTAL         => 1,
+    TOTAL         => ($attr->{MONIT})? 0 : 1,
     OUTPUT2RETURN => 1
   });
   
-  if ($attr->{MONIT}){
-    return simple_table({
-      data      => \@$list,
-      orderable => undef,
-      searching => undef,
-      paging    => undef,
-    }, { id => 'NMS_TRAPS_LIST' });
-  }
   my $scr = qq(
     <script>
     jQuery('a#trap').on('click', function(){
@@ -112,9 +109,10 @@ sub nms_traps {
     })
     </script>
   );
-  print $table.$scr;
 
-  return 1
+  return $table->show() if $attr->{MONIT};
+  print $table.$scr;
+  return 1;
 }
 
 #********************************************************

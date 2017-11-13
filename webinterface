@@ -156,7 +156,7 @@ sub equipment_stats_edit {
 sub nms_obj {
   
   my ($attr) = @_;
-  $pages_qs .= ($FORM{ID}) ? "&ID=$FORM{ID}" : q{};
+  
   $LIST_PARAMS{SORT} = $FORM{sort} || 1;
   if ($FORM{del}){
     $Nms->obj_del($FORM{del})
@@ -168,7 +168,7 @@ sub nms_obj {
       SYS_NAME     => '_SHOW',
       SYS_LOCATION => '_SHOW',
       SYS_OBJECTID => '_SHOW',
-      STATUS       => $attr->{STATUS} || '_SHOW',
+      STATUS       => $attr->{STATUS} || $FORM{STATUS} || '_SHOW',
       NAS_ID       => '_SHOW',
       ID           => $FORM{ID} || '_SHOW',
       PAGE_ROWS    => 1000000,
@@ -176,7 +176,9 @@ sub nms_obj {
       %LIST_PARAMS,
     });
 
-  if ($FORM{ID}) {
+  if ($FORM{ID} || $FORM{IP}) {
+    my $obj_id = $FORM{ID} || $nms->[0]->{id};
+    $pages_qs .= "&ID=$obj_id";
     my @header_arr = ("$lang{MAIN}:index=$index&visual=INFO$pages_qs");
     my $heads = $Nms->oids_list({
       OBJECTID  => $nms->[0]->{sysobjectid},
@@ -189,7 +191,7 @@ sub nms_obj {
     foreach my $val (@$heads){
       push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs";
     };
-    if ( $Equipment->graph_list({ OBJ_ID => $FORM{ID} }) ) {
+    if ( $Equipment->graph_list({ OBJ_ID => $obj_id }) ) {
       push @header_arr, "$lang{STATS}:index=$index&visual=STATS$pages_qs";
     }
     push @header_arr, "MIBs Browser:index=$index&visual=MIB_BR$pages_qs";
@@ -199,7 +201,7 @@ sub nms_obj {
       my $obj_select = $html->form_select(
          'ID',
          {
-           SELECTED => $attr->{ID} || $FORM{ID},
+           SELECTED => $attr->{ID} || $obj_id,
            SEL_LIST => $Nms->obj_list(
              {
                IP  => '_SHOW',
@@ -213,13 +215,13 @@ sub nms_obj {
            SEL_VALUE      => 'ip,syslocation',
            NO_ID          => 1,
            MAIN_MENU      => get_function_index('nms_obj'),
-           MAIN_MENU_ARGV => "ID=" . ($FORM{ID} || '')
+           MAIN_MENU_ARGV => "ID=" . ($obj_id || '')
          }
        );
 
       my $obj_select_form = $html->form_main(
          {
-           CONTENT => $obj_select . $html->form_input('SHOW', $lang{SHOW}, { TYPE => 'submit' }),
+           CONTENT => $obj_select,
            HIDDEN  => {
              'index'  => $index,
              'visual' => $FORM{visual} || 0,
@@ -235,19 +237,24 @@ sub nms_obj {
 
     my $visual = $FORM{visual} || 'INFO';
     if ($visual eq 'INFO') {
-      nms_obj_data({ ID => $FORM{ID}});
+      nms_obj_data({ ID => $obj_id });
     } 
     elsif ($visual eq 'STATS') {
-      nms_snmp_stats({ ID => $FORM{ID} });
+      nms_snmp_stats({ ID => $obj_id });
     } 
     elsif ($visual eq 'MIB_BR') {
-      mibs_browser({ ID => $FORM{ID} });
+      mibs_browser({ ID => $obj_id });
     } 
     else {
-      oid_table({ ID => $FORM{ID}, SECT => $visual, OBJECTID  => $nms->[0]->{sysobjectid} });
+      oid_table({ ID => $obj_id, SECT => $visual, OBJECTID  => $nms->[0]->{sysobjectid} });
     }
   }
   elsif ($Nms->{TOTAL} != 0) {
+    my @status_bar = (
+      "$lang{ALL}:index=$index",
+      "$lang{ENABLED}:index=$index&STATUS=0",
+      "$lang{DISABLED}:index=$index&STATUS=1",
+    );
     my ($table) = result_former({
       INPUT_DATA      => $Nms,
       LIST            => $nms,
@@ -269,20 +276,24 @@ sub nms_obj {
         caption    => " ",
         qs         => $pages_qs,
         ID         => 'OBJ_LIST',
+        header     => $html->table_header(\@status_bar),
         DATA_TABLE => {
           lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
-          ordering   => undef
+          ordering   => undef,
+          searching  => ($attr->{MONIT})? undef : 'true',
+          paging     => ($attr->{MONIT})? undef : 'true'
         }
       },
       MAKE_ROWS       => 1,
       SKIP_USER_TITLE => 1,
       SKIP_PAGES      => 1,
-      TOTAL           => 1,
+      TOTAL           => ($attr->{MONIT})? 0 : 1,
       OUTPUT2RETURN   => 1
     });
+    return $table->show() if $attr->{MONIT};
     print $table;
   }
-  return $Nms->{TOTAL};
+  return 1;
 }
 
 #**********************************************************
@@ -508,10 +519,12 @@ sub nms_snmp_table {
   }
 
   my $table =  $html->table({
-    ID         => $attr->{OID},
+    ID          => $attr->{OID},
+    title_plain => \@{$attr->{columns}},
     DATA_TABLE => {
       data    => \@sorted_vals,
-      columns => \@columns
+      columns => \@columns,
+      lengthMenu => [[10, 28, 52, -1],[10, 28, 52, $lang{ALL}]],
     }
   });
   return $table->show()
@@ -1134,10 +1147,10 @@ sub make_tree {
 sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
-  my $obj = nms_obj({ STATUS => 1 });
-  if ($obj == 0) {
-    nms_snmp_stats({ MONIT => 1 });
-  }
+  print nms_obj({ STATUS => 1, MONIT => 1 });
+  #if ($obj == 0) {
+ #   nms_snmp_stats({ MONIT => 1 });
+  #}
   print nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
 
   my $scr = qq(
