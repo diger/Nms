@@ -753,18 +753,22 @@ sub nms_snmp_stats {
     );    
   }
 
+  my $chart;
   foreach my $in (sort { $a <=> $b } keys %ind) {
-    print $html->make_charts3({
-      DATA     => \@{$ind{$in}},
-      XKEYS    => \@{$params{$in}},
-      LABELS   => \@{$params{$in}},
-      GRAPH_ID => $in,
-      UNITS    => 'Mb/s',
-      HEADER   => "$stats->[0]->{sysname}: $lang{PORT} $in"
+    $chart .= $html->make_charts3("$stats->[0]->{sysname}: $lang{PORT} $in", 'Line', {
+      data      => \@{$ind{$in}},
+      ykeys     => \@{$params{$in}},
+      xkey     => 'y',
+      labels    => \@{$params{$in}},
+      element   => $in,
+      postUnits => 'Mb/s',
+      hideHover => 'auto',
+      resize    => 'true'
     });
   }
-
-  return 1;
+  return $chart if $attr->{MONIT};
+  print $chart;
+  return 1
 }
 
 #**********************************************************
@@ -1147,26 +1151,44 @@ sub make_tree {
 sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
-  print nms_obj({ STATUS => 1, MONIT => 1 });
-  #if ($obj == 0) {
- #   nms_snmp_stats({ MONIT => 1 });
-  #}
-  print nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
+  my $page = nms_obj({ STATUS => 1, MONIT => 1 });
+  if ($page eq '1') {
+    $page = nms_snmp_stats({ MONIT => 1 });
+  }
+  $page .= nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
 
   my $scr = qq(
-  <script type="text/javascript">
-    var table = jQuery('#NMS_TRAPS_LIST_').DataTable( {
-      ajax: "index.cgi?get_index=nms_traps&sort=1&EXPORT_CONTENT=NMS_TRAPS_LIST&header=1&json=1&PAGE_ROWS=10",
-      orderable: false,
-      serverSide: true,
-    } );
- 
-    setInterval( function () {
-      table.ajax.reload( null, false ); // user paging is not reset on reload
-    }, 30000 );
-  </script>
+    <script type="text/javascript">
+      var url = 'index.cgi?get_index=nms_monitor&header=2&REFRESH=1';
+      var ref_timer = '';
+      var timerId = '';
+      function loadNowPlaying(){
+        jQuery("#MONIT").load(url);
+      }
+      jQuery("input[name=toggle]").change(function(){
+       if(jQuery(this).is(':checked')){
+         ref_timer = (jQuery("#timer").val() >= 10 ) ? jQuery("#timer").val() : 60;
+       //  alert(ref_timer);
+         timerId = setInterval(function(){loadNowPlaying()}, ref_timer*1000);
+       }
+       else{
+         clearInterval(timerId);
+       }
+      });
+    </script>
   );
- # print $scr;
+  my $refr = $html->element('label', $html->element('input', undef, {
+        type => 'checkbox',
+        name => 'toggle'
+      }) . 'Refresh', { class=>'checkbox-inline' }) ;
+  $refr .= $html->element('label', $html->element('input', undef, {
+        type => 'number',
+        min  => '10',
+        id   => 'timer',
+        placeholder => '60'
+      }) . ' seconds', { class=>'checkbox-inline' }) ;
+  print $html->element('div', $page, { ID => 'MONIT'} );
+  print $refr . $scr if (!$FORM{REFRESH});
 
   return 1;
 }

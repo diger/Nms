@@ -35,17 +35,17 @@ sub nms_traps {
   SNMP::addMibFiles(glob('../../var/snmp/mibs/private' . '/*'));
   SNMP::loadModules('LLDP-MIB');
 
-  if ($FORM{ALERT}){
+  if ($attr->{MONIT}){
     my $oids = $Nms->oids_list({ TYPE => 'alert', SECTION => '_SHOW', COLS_NAME => 1 });
     my @alerts_arr;
     foreach my $oid (@$oids) {
       push @alerts_arr, substr($SNMP::MIB{$oid->{section}}{objectID},1);
     }
-    $LIST_PARAMS{oid} = join(",", @alerts_arr);
+    $LIST_PARAMS{OID} = join(",", @alerts_arr);
+    $LIST_PARAMS{MONIT} = 1;
   }
   if ($attr->{PAGE_ROWS} || $FORM{PAGE_ROWS}){
 	  $LIST_PARAMS{PAGE_ROWS} = $attr->{PAGE_ROWS} || $FORM{PAGE_ROWS};
-	  $LIST_PARAMS{MONIT} = 1;
   }
   if ($FORM{NAS_ID}){
     $LIST_PARAMS{NAS_ID} = $FORM{NAS_ID};
@@ -67,17 +67,16 @@ sub nms_traps {
 
     return 1
   }
-  
+
   my ($table,$list) = result_former({
     INPUT_DATA      => $Traps,
     FUNCTION        => 'traps_list',
     DEFAULT_FIELDS  => 'TRAPTIME, IP, LABEL, TIMETICKS',
 #    FUNCTION_FIELDS => 'nms_traps:stats:id;&pg='.($FORM{pg}||''),
-    HIDDEN_FIELDS   => 'ID',
+    HIDDEN_FIELDS   => 'ID,OID',
     EXT_TITLES      => {
       traptime => $lang{TIME},
       label     => $lang{NAME},
-      oid      => 'OID',
       ip       => "IP ".$lang{ADDRESS},
     },
     SKIP_USER_TITLE => 1,
@@ -92,9 +91,9 @@ sub nms_traps {
       qs      => ($FORM{NAS_ID})? "$pages_qs&NAS_ID=$FORM{NAS_ID}" : $pages_qs,
       ID      => 'NMS_TRAPS_LIST',
       DATA_TABLE => ($attr->{MONIT})?{
-        orderable => undef,
         searching => undef,
         paging    => undef,
+        order     => [[ 0, 'desc' ]]
       } : undef
     },
     MAKE_ROWS     => 1,
