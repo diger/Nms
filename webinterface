@@ -273,10 +273,10 @@ sub nms_obj {
       },
       SELECT_VALUE    => { sysobjectid => \%$oid_hash },
       TABLE => {
-        caption    => " ",
+        caption    => ($attr->{MONIT})? $html->color_mark($lang{DISABLED},'#FF0000') : "$lang{LIST} - $lang{EQUIPMENT}",
         qs         => $pages_qs,
         ID         => 'OBJ_LIST',
-        header     => $html->table_header(\@status_bar),
+        header     => (!$attr->{MONIT})? $html->table_header(\@status_bar):undef,
         DATA_TABLE => {
           lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
           ordering   => undef,

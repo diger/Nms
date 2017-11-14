@@ -86,7 +86,7 @@ sub nms_traps {
      },
     TABLE           => {
       width   => '100%',
-      caption => "$lang{TRAPS}",
+      caption => (!$attr->{MONIT})? $lang{TRAPS} : undef,
       header  => $html->button( "$lang{CONFIG} $lang{TRAPS}", "index=".get_function_index( 'nms_trap_types' ), { class => 'change' } ),
       qs      => ($FORM{NAS_ID})? "$pages_qs&NAS_ID=$FORM{NAS_ID}" : $pages_qs,
       ID      => 'NMS_TRAPS_LIST',
