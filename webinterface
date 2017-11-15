@@ -56,20 +56,56 @@ sub nms_obj {
   if ($FORM{del}){
     $Nms->obj_del($FORM{del})
   }
+  
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
   my $nms = $Nms->obj_list({
-      IP           => $FORM{IP} || '_SHOW',
-      NAS_NAME     => '_SHOW',
-      SYS_NAME     => '_SHOW',
-      SYS_LOCATION => '_SHOW',
-      SYS_OBJECTID => '_SHOW',
-      STATUS       => $attr->{STATUS} || $FORM{STATUS} || '_SHOW',
-      NAS_ID       => '_SHOW',
-      ID           => $FORM{ID} || '_SHOW',
-      PAGE_ROWS    => 1000000,
-      COLS_NAME    => 1,
-      %LIST_PARAMS,
-    });
+    IP           => $FORM{IP} || '_SHOW',
+    NAS_NAME     => '_SHOW',
+    SYS_NAME     => '_SHOW',
+    SYS_LOCATION => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    STATUS       => $attr->{STATUS} || $FORM{STATUS} || '_SHOW',
+    RO_COMMUNITY => '_SHOW',
+    RW_COMMUNITY => '_SHOW',
+    NAS_ID       => '_SHOW',
+    ID           => $FORM{ID} || '_SHOW',
+    PAGE_ROWS    => 1000000,
+    COLS_NAME    => 1,
+    %LIST_PARAMS,
+  });
+  if ( $FORM{chg} ) {
+  	my $STATUS = $html->form_select(
+      'STATUS',
+      	{
+        		SELECTED  => $nms->[0]->{status}|| '',
+            SEL_HASH     => {
+              0  => $lang{ENABLED},
+              1  => $lang{DISABLED}
+            },
+            NO_ID        => 1,
+            SORT_KEY_NUM => 1
+      	}
+      );
+    print $html->form_main({
+          	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
+                        label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
+                        label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
+                        label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>1}).
+                        label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>1}).
+                        label_w_txt($lang{STATUS}, $STATUS).
+                        label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
+                            TYPE => 'SUBMIT'
+                          }) . "	" .
+      											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+      								  {RCOL => 3}),
+      	    METHOD  => 'GET',
+          	HIDDEN  => {
+            				'index'    => $index,
+            				'ID'       => $FORM{chg} || '',
+          				},
+        	});
+    return 1;
+  }
 
   if ($FORM{ID} || $FORM{IP}) {
     my $obj_id = $FORM{ID} || $nms->[0]->{id};
@@ -109,8 +145,8 @@ sub nms_obj {
            SEL_KEY        => 'id',
            SEL_VALUE      => 'ip,syslocation',
            NO_ID          => 1,
-           MAIN_MENU      => get_function_index('obj_prop'),
-           MAIN_MENU_ARGV => "ID=" . ($obj_id || '')
+           MAIN_MENU      => $index,
+           MAIN_MENU_ARGV => "chg=" . ($obj_id || '')
          }
        );
 
@@ -155,8 +191,8 @@ sub nms_obj {
       LIST            => $nms,
       BASE_FIELDS     => 1,
       DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID, STATUS',
-      HIDDEN_FIELDS   => 'NAS_ID,ID',
-      FUNCTION_FIELDS => 'obj_prop:change:id,del',
+      HIDDEN_FIELDS   => 'NAS_ID,ID,RO_COMMUNITY,RW_COMMUNITY',
+      FUNCTION_FIELDS => 'change,del',
       EXT_TITLES      => {
         ip       => 'IP',
         name     => "$lang{NAME} NAS",
@@ -675,6 +711,8 @@ sub nms_snmp_stats {
     $attr -
       CTRL - for form with input control
       COLOR - color of label
+      ID - 
+      TYPE -
       LCOL
       RCOL
       
@@ -685,12 +723,21 @@ sub nms_snmp_stats {
 #**********************************************************
 sub label_w_txt {
 	my ($label,$text,$attr) = @_;
-	my $class ='';
-	$class .= 'control-label' if (!$attr->{CTRL}) ;
-	$class .= "label-$attr->{COLOR}" if ($attr->{COLOR}) ;
+	my $class = ($attr->{COLOR}) ? "label-$attr->{COLOR}" : '' ;
+  my $flabel =  $html->element(($attr->{INP})? 'span' : 'label', $label, {
+    class => 'control-label col-sm-' . ($attr->{LCOL}||'2'),
+    for => $attr->{ID} || $label
+  });
+  my $ftext =  $html->element(($attr->{INP})?'input':'p', $text, {
+    class => ($attr->{INP})?'form-control':'form-control-static',
+    id => $attr->{ID} || $label,
+    name => $attr->{ID} || $label,
+    type => $attr->{TYPE} || undef,
+    placeholder => ($attr->{INP})? $text : undef
+  });
+  $ftext =  $html->element('div', $ftext, { class => 'col-sm-' . ($attr->{RCOL}||'3') . $class });
 	
-	return "<div class='form-group'><label class='$class col-sm-" . ($attr->{LCOL}||'6') . "'>".
-				($label||'') . "</label><div class='col-sm-" . ($attr->{RCOL}||'6') . "'>" . ($text || '') . "</div></div>";
+	return $html->element('div', $flabel.$ftext, { class => 'form-group' });
 }
 #**********************************************************
 
@@ -1292,60 +1339,6 @@ sub oid_table_row_edit {
          </script>
          );
   print $scr;
-  return 1;
-}
-#**********************************************************
-
-=head2 obj_prop()
-
-=cut
-
-#**********************************************************
-sub obj_prop {
-  my ($id) = @_;
-  
-  my $nms = $Nms->obj_list({
-    IP           => $FORM{IP} || '_SHOW',
-    SYS_NAME     => '_SHOW',
-    SYS_LOCATION => '_SHOW',
-    SYS_OBJECTID => '_SHOW',
-    STATUS       => '_SHOW',
-    RO_COMMUNITY => '_SHOW',
-    RW_COMMUNITY => '_SHOW',
-    ID           => $FORM{ID} || $id,
-    COLS_NAME    => 1,
-#    %LIST_PARAMS,
-  });
-
-  print Dumper $nms;
-	my $NAME_SEL = $html->form_select(
-    'NAME',
-    	{
-      		SELECTED  => $nms->[0]->{status}|| '',
-          SEL_HASH     => {
-            0  => $lang{ENABLED},
-            1  => $lang{DISABLED}
-          },
-          NO_ID        => 1,
-          SORT_KEY_NUM => 1
-    	}
-    );
-  print $html->form_main({
-        	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
-                      label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
-                      label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
-                      label_w_txt($lang{STATUS}, $NAME_SEL).
-                      label_w_txt(undef, $html->form_input( 'SAVE', ( $FORM{chg} )? $lang{CHANGE} : $lang{CREATE}, {
-                          TYPE => 'SUBMIT'
-                        }) . "	" .
-    											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
-    								  {RCOL => 3}),
-    	    METHOD  => 'GET',
-        	HIDDEN  => {
-          				'index'    => $index,
-          				'ID'       => $FORM{ID} || '',
-        				},
-      	});
   return 1;
 }
 

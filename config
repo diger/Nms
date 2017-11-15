@@ -1,15 +1,14 @@
 %FUNCTIONS_LIST = (
   "1:0:NMS:sysobjectid_table:"              => 5,
-  "2:1:OIDS:oids_set:OBJECTID"              => 5,
+  "2:1:OIDS:oids_set:OBJECTID"        => 5,
   "3:1:SNMP Modules:modules_table:OBJECTID" => 5,
   "4:1:Cable Test:cable_test_setup:"        => 5,
   "5:1:Traps:nms_trap_types:"               => 5,
   "6:0:NMS:nms_monitor:"                    => 6,
   "7:0:NMS:nms_obj:"                        => 8,
-  "8:1:OBJ_PROP:obj_prop:ID"                => 8,
-  "9:0:MIBS browser:mibs_browser:"          => 8,
-  "10:0:Traps:nms_traps:"                   => 8,
-  "11:0:Cable test:cable_test:UID"          => 20,
+  "8:0:MIBS browser:mibs_browser:"          => 8,
+  "9:0:Traps:nms_traps:"                    => 8,
+  "10:0:Cable test:cable_test:UID"          => 20,
 );
 
 %PERIODIC = (daily   => [ 'nms_traps_clean' ]);
