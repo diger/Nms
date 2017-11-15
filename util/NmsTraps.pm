@@ -84,10 +84,10 @@ sub nms_traps {
       ip    => "search_link:nms_obj:,IP",
       label => 'oid_conv::,ID',
      },
-    TABLE           => {
+    TABLE  => {
       width   => '100%',
-      caption => (!$attr->{MONIT})? $lang{TRAPS} : undef,
-      header  => $html->button( "$lang{CONFIG} $lang{TRAPS}", "index=".get_function_index( 'nms_trap_types' ), { class => 'change' } ),
+      caption => (!$attr->{MONIT})? 'Traps' : undef,
+      header  => $html->button( "$lang{CONFIG} 'Traps", "index=".get_function_index( 'nms_trap_types' ), { class => 'change' } ),
       qs      => ($FORM{NAS_ID})? "$pages_qs&NAS_ID=$FORM{NAS_ID}" : $pages_qs,
       ID      => 'NMS_TRAPS_LIST',
       DATA_TABLE => ($attr->{MONIT})?{

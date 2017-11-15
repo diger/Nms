@@ -12,7 +12,6 @@ use POSIX qw(strftime);
 use Abills::Base qw(in_array mk_unique_value load_pmodule2 date_format _bp);
 use Abills::Filters qw(_mac_former dec2hex);
 require Abills::Misc;
-use Equipment;
 use Data::Dumper;
 use Nms::db::Nms;
 
@@ -23,7 +22,6 @@ our ($html,
   $db,
 );
 
-our $Equipment = Equipment->new( $db, $admin, \%conf );
 our $Nms = Nms->new( $db, $admin, \%conf );
 
 load_pmodule2('SNMP');
@@ -42,109 +40,6 @@ $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
 
 require Nms::util::CableTest;
 require Nms::util::NmsTraps;
-#**********************************************************
-
-=head2 equipment_stats_edit()
-
-=cut
-
-#**********************************************************
-sub equipment_stats_edit {
- my ($attr) = @_;
- 
- $pages_qs .= ($FORM{NAS_ID} && $FORM{PORT}) ? "&NAS_ID=$FORM{NAS_ID}&PORT=$FORM{PORT}" : q{};
- my $root_index = get_function_index('equipment_panel_new') . "&NAS_ID=$FORM{NAS_ID}&visual=PORTS";
-  
-  if ( $FORM{DEL} ) {
-  $Equipment->graph_del( $FORM{DEL} );
-  }
-  
-  if ( $FORM{SAVE} && $FORM{ID} && $FORM{NAME} ) {
-  $Equipment->graph_change( { ID           => $FORM{ID},
-                PARAM        => $FORM{NAME},
-                COMMENTS     => $FORM{COMMENTS},
-                MEASURE_TYPE => $FORM{TYPE},
-               } );
-  } 
-  elsif ( !$FORM{ID} && $FORM{NAME} ) {
-    $Equipment->graph_add({ NAS_ID       => $FORM{NAS_ID},
-              PORT         => $FORM{PORT},
-              COMMENTS     => $FORM{COMMENTS},
-              PARAM        => $FORM{NAME},
-              MEASURE_TYPE => $FORM{TYPE},
-              });
-  }
-  my $params = $Equipment->graph_list( {
-    COLS_NAME    => 1,
-    ID       => $FORM{EDIT} ||  '_SHOW',
-    NAS_ID       => $attr->{NAS_ID} || $FORM{NAS_ID},
-    PORT         => $attr->{PORT} || $FORM{PORT} || '_SHOW',
-    PARAM        => '_SHOW',
-    MEASURE_TYPE => '_SHOW',
-    COMMENTS     => '_SHOW',
-    TOTAL        => 1
-  } );
-  
-  if ( !$FORM{ADD} && !$FORM{EDIT}) {
-    my $size = ($params)? @$params : 0;
-    my $table = $html->table(
-        {
-            width       => '100%',
-            caption    => "NAS ID: $FORM{NAS_ID}  $lang{PORT}: $FORM{PORT}",
-            MENU    => "$lang{BACK}:index=$root_index:fees;$lang{ADD}:index=$index$pages_qs&ADD=1:add",
-            title_plain => [ $lang{NAME}, $lang{TYPE}, $lang{COMMENTS} ],
-            ID          => "STATS_EDIT",
-            HAS_FUNCTION_FIELDS => 1
-        }
-      );
-    foreach my $var (@$params) {
-      $table->addrow( $var->{param}, $var->{measure_type},$var->{comments},
-              $html->button('', "index=$index$pages_qs&EDIT=$var->{id}",
-                    {
-                    ICON  => 'glyphicon glyphicon-pencil text-info',
-                    title => $lang{DEL},
-                    }
-                  ).
-              $html->button('', "index=$index$pages_qs&TYPE=$var->{measure_type}&DEL=$var->{id}&TOTAL=$size",
-                    {
-                    ICON  => 'glyphicon glyphicon-trash text-danger',
-                    title => $lang{DEL},
-                    }
-                  )
-              );
-    }
-    print $table->show();
-  } 
-  else {
-  my $FIELDS_SEL = $html->form_select(
-    'TYPE',
-      {
-        SELECTED  => ( $FORM{EDIT} )?  $params->[0]->{measure_type}: $FORM{TYPE} ,
-        SEL_ARRAY => ['COUNTER', 'GAUGE', 'DERIVE'],
-      }
-    );
-  $html->message( 'warning', "NAS ID: $FORM{NAS_ID}  $lang{PORT}: $FORM{PORT} <span class='fa fa-cog fa-spin'> </span> " );
-  
-  print $html->form_main(
-      {
-          CONTENT =>  label_w_txt( $lang{NAME}, $html->form_input('NAME', ( $FORM{EDIT} )?  $params->[0]->{param}:'') ).
-                label_w_txt( $lang{TYPE}, $FIELDS_SEL ).
-                label_w_txt( $lang{COMMENTS}, $html->form_input('COMMENTS', ( $FORM{EDIT} )?  $params->[0]->{comments}:'') ).
-                label_w_txt( $html->form_input( 'SAVE', ( $FORM{EDIT} )? $lang{CHANGE} : $lang{CREATE}, { TYPE => 'SUBMIT' } ) . "  ".
-                             $html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}) ),
-          METHOD  => 'GET',
-          #class   => 'form-vertical',
-          HIDDEN  => {
-                  'index' => $index,
-                  'ID'    => $FORM{EDIT},
-                  'NAS_ID'=> $FORM{NAS_ID},
-                  'PORT'  => $FORM{PORT}
-                },
-        } );
-  }
-
-  return 1;
-}
 
 #**********************************************************
 
@@ -191,9 +86,9 @@ sub nms_obj {
     foreach my $val (@$heads){
       push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs";
     };
-    if ( $Equipment->graph_list({ OBJ_ID => $obj_id }) ) {
+ #   if ( $Equipment->graph_list({ OBJ_ID => $obj_id }) ) {
       push @header_arr, "$lang{STATS}:index=$index&visual=STATS$pages_qs";
-    }
+ #   }
     push @header_arr, "MIBs Browser:index=$index&visual=MIB_BR$pages_qs";
     
     my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
@@ -214,7 +109,7 @@ sub nms_obj {
            SEL_KEY        => 'id',
            SEL_VALUE      => 'ip,syslocation',
            NO_ID          => 1,
-           MAIN_MENU      => get_function_index('nms_obj'),
+           MAIN_MENU      => get_function_index('obj_prop'),
            MAIN_MENU_ARGV => "ID=" . ($obj_id || '')
          }
        );
@@ -261,14 +156,14 @@ sub nms_obj {
       BASE_FIELDS     => 1,
       DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID, STATUS',
       HIDDEN_FIELDS   => 'NAS_ID,ID',
-      FUNCTION_FIELDS => 'change,del',
+      FUNCTION_FIELDS => 'obj_prop:change:id,del',
       EXT_TITLES      => {
         ip       => 'IP',
         name     => "$lang{NAME} NAS",
       },
       FILTER_COLS  => {
         ip          => "search_link:nms_obj:,ID",
-        name        => "search_link:equipment_info:,NAS_ID",
+        name        => "search_link:form_nas:,NAS_ID",
         sysobjectid => "search_link:sysobjectid_table:,SYSOBJECTID",
       },
       SELECT_VALUE    => { sysobjectid => \%$oid_hash },
@@ -1399,5 +1294,60 @@ sub oid_table_row_edit {
   print $scr;
   return 1;
 }
+#**********************************************************
+
+=head2 obj_prop()
+
+=cut
+
+#**********************************************************
+sub obj_prop {
+  my ($id) = @_;
+  
+  my $nms = $Nms->obj_list({
+    IP           => $FORM{IP} || '_SHOW',
+    SYS_NAME     => '_SHOW',
+    SYS_LOCATION => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    STATUS       => '_SHOW',
+    RO_COMMUNITY => '_SHOW',
+    RW_COMMUNITY => '_SHOW',
+    ID           => $FORM{ID} || $id,
+    COLS_NAME    => 1,
+#    %LIST_PARAMS,
+  });
+
+  print Dumper $nms;
+	my $NAME_SEL = $html->form_select(
+    'NAME',
+    	{
+      		SELECTED  => $nms->[0]->{status}|| '',
+          SEL_HASH     => {
+            0  => $lang{ENABLED},
+            1  => $lang{DISABLED}
+          },
+          NO_ID        => 1,
+          SORT_KEY_NUM => 1
+    	}
+    );
+  print $html->form_main({
+        	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
+                      label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
+                      label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
+                      label_w_txt($lang{STATUS}, $NAME_SEL).
+                      label_w_txt(undef, $html->form_input( 'SAVE', ( $FORM{chg} )? $lang{CHANGE} : $lang{CREATE}, {
+                          TYPE => 'SUBMIT'
+                        }) . "	" .
+    											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+    								  {RCOL => 3}),
+    	    METHOD  => 'GET',
+        	HIDDEN  => {
+          				'index'    => $index,
+          				'ID'       => $FORM{ID} || '',
+        				},
+      	});
+  return 1;
+}
+
 
 1;
