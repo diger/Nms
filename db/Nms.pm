@@ -105,13 +105,13 @@ sub obj_add {
   my $UPD =  $self->search_former($attr,
     [
     ['IP',           'IP',  'ip',                      1 ],
-	  ['SYS_NAME',     'STR', 'sysname',                 1 ],
-	  ['SYS_LOCATION', 'STR', 'syslocation',             1 ],
+    ['SYS_NAME',     'STR', 'sysname',                 1 ],
+    ['SYS_LOCATION', 'STR', 'syslocation',             1 ],
     ['SYS_OBJECTID', 'STR', 'sysobjectid',             1 ],
     ['STATUS',       'INT', 'status',                  1 ],
-	  ['ID',           'INT', 'id',                      1 ],
-	  ['RO_COMMUNITY', 'STR', 'ro_community',            1 ],
-	  ['RW_COMMUNITY', 'STR', 'rw_community',            1 ],
+    ['ID',           'INT', 'id',                      1 ],
+    ['RO_COMMUNITY', 'STR', 'ro_community',            1 ],
+    ['RW_COMMUNITY', 'STR', 'rw_community',            1 ],
     ]
   );
   $UPD =~ s/AND/,/g;
