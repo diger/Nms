@@ -56,8 +56,17 @@ sub nms_obj {
   if ($FORM{del}){
     $Nms->obj_del($FORM{del})
   }
+  if ($FORM{SAVE}){
+    $Nms->obj_add({
+      ID           => $FORM{OBJ_ID},
+      RW_COMMUNITY => $FORM{Rw_COMMUNITY},
+      RO_COMMUNITY => $FORM{RO_COMMUNITY},
+      STATUS       => $FORM{STATUS},
+    })
+  }
   
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
+  my $so_index = get_function_index('sysobjectid_table');
   my $nms = $Nms->obj_list({
     IP           => $FORM{IP} || '_SHOW',
     NAS_NAME     => '_SHOW',
@@ -68,7 +77,7 @@ sub nms_obj {
     RO_COMMUNITY => '_SHOW',
     RW_COMMUNITY => '_SHOW',
     NAS_ID       => '_SHOW',
-    ID           => $FORM{ID} || '_SHOW',
+    ID           => $FORM{ID} || $FORM{chg} || '_SHOW',
     PAGE_ROWS    => 1000000,
     COLS_NAME    => 1,
     %LIST_PARAMS,
@@ -90,6 +99,8 @@ sub nms_obj {
           	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
                         label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
                         label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
+                        label_w_txt('SYS_OBJECTID', $html->element('a', $oid_hash->{$nms->[0]->{sysobjectid}},
+                        { href => "index.cgi?index=" . $so_index . "&SYSOBJECTID=" . $nms->[0]->{sysobjectid} })).
                         label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>1}).
                         label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>1}).
                         label_w_txt($lang{STATUS}, $STATUS).
@@ -101,8 +112,9 @@ sub nms_obj {
       	    METHOD  => 'GET',
           	HIDDEN  => {
             				'index'    => $index,
-            				'ID'       => $FORM{chg} || '',
+            				'OBJ_ID'   => $FORM{chg} || '',
           				},
+            class => 'form-horizontal'
         	});
     return 1;
   }
@@ -425,15 +437,15 @@ sub nms_snmp_table {
       if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$key}->{$ind} ){
         $results->{$key}->{$ind} =~ s/"|\n//g;
         my @in_hex = split(/ /, $results->{$key}->{$ind});
-        my $index='';
+        my $ind_ex='';
         foreach my $hex (@in_hex){
-          $index .= sprintf( "%08b", hex($hex));
+          $ind_ex .= sprintf( "%08b", hex($hex));
         }
         $results->{$key}->{$ind} = '';
         my $offset = 0;
-        my $result = index($index, 1, $offset);
+        my $result = index($ind_ex, 1, $offset);
         while ($result != - 1) {
-          $result = index($index, 1, $offset);
+          $result = index($ind_ex, 1, $offset);
           $offset = $result + 1;
           $results->{$key}->{$ind} .= "$offset " if ( $offset > 0 );
         }

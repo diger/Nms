@@ -89,23 +89,39 @@ sub obj_list {
 }
 
 #**********************************************************
-# obj_add()
+# obj__add()
 #**********************************************************
 sub obj_add {
   my $self = shift;
   my ($attr) = @_;
+  my $SECRETKEY = $CONF->{secretkey} || '';
+  if($attr->{RO_COMMUNITY}) {
+    $attr->{RO_COMMUNITY} = "ENCODE('$attr->{RO_COMMUNITY}', $SECRETKEY)"
+  }
+  if($attr->{RW_COMMUNITY}) {
+    $attr->{RW_COMMUNITY} = "ENCODE('$attr->{RW_COMMUNITY}', $SECRETKEY)"
+  }
 
-  $self->query2("INSERT INTO nms_obj ( ip, sysobjectid, sysname, syslocation ) VALUES
-				('$attr->{IP}',
-         '$attr->{SYSOBJECTID}',
-         '$attr->{SYSNAME}',
-         '$attr->{SYSLOCATION}')
-				ON DUPLICATE KEY UPDATE sysobjectid='$attr->{SYSOBJECTID}',
-                                sysname='$attr->{SYSNAME}',
-                                syslocation='$attr->{SYSLOCATION}'
-                                ", 'do'
+  my $UPD =  $self->search_former($attr,
+    [
+    ['IP',           'IP',  'ip',                      1 ],
+	  ['SYS_NAME',     'STR', 'sysname',                 1 ],
+	  ['SYS_LOCATION', 'STR', 'syslocation',             1 ],
+    ['SYS_OBJECTID', 'STR', 'sysobjectid',             1 ],
+    ['STATUS',       'INT', 'status',                  1 ],
+	  ['ID',           'INT', 'id',                      1 ],
+	  ['RO_COMMUNITY', 'STR', 'ro_community',            1 ],
+	  ['RW_COMMUNITY', 'STR', 'rw_community',            1 ],
+    ]
+  );
+  $UPD =~ s/AND/,/g;
+  $self->{SEARCH_FIELDS} =~ s/,\s$//;
+  my $VALUES = join(',', @{$self->{SEARCH_VALUES}});
+  $self->query2("INSERT INTO nms_obj ( $self->{SEARCH_FIELDS} ) VALUES
+				( $VALUES )
+				ON DUPLICATE KEY UPDATE $UPD;", 'do'
 				);
-        
+     
   return $self;
 }
 
