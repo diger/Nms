@@ -189,24 +189,7 @@ sub oids_list {
 sub obj_oids_add {
   my $self = shift;
   my ($attr) = @_;
-=comm
-  my $UPD =  $self->search_former($attr,
-    [
-      ['ID',       'INT', 'id',       1 ],
-      ['SECTION',  'STR', 'section',  1 ],
-      ['LABEL',    'STR', 'label',    1 ],
-  	  ['OBJECTID', 'STR', 'objectID', 1 ],
-  	  ['IID',      'INT', 'iid',      1 ],
-  	  ['TYPE',     'STR', 'type',     1 ],
-  	  ['ACCESS',   'STR', 'access',   1 ],
-    ]
-  );
-  
-  $self->query2("INSERT INTO nms_oids ( $self->{SEARCH_FIELDS} ) VALUES
-				( $self->{SEARCH_VALUES} )
-				ON DUPLICATE KEY UPDATE $UPD;", 'do'
-				);
-=cut
+
   $self->query_add( 'nms_oids', $attr,
     {
       REPLACE => 1

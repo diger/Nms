@@ -1,6 +1,6 @@
 %FUNCTIONS_LIST = (
   "1:0:NMS:sysobjectid_table:"              => 5,
-  "2:1:OIDS:oids_set:OBJECTID"        => 5,
+  "2:1:OIDS:oids_set:OBJECTID"              => 5,
   "3:1:SNMP Modules:modules_table:OBJECTID" => 5,
   "4:1:Cable Test:cable_test_setup:"        => 5,
   "5:1:Traps:nms_trap_types:"               => 5,

@@ -1165,81 +1165,6 @@ sub oids_set {
   my ($attr) = @_;
 
   load_mibs({ OBJECTID => $FORM{OBJECTID} });
-  if ( $FORM{SAVE} ) {
-    $Nms->obj_oids_add({SECTION=>'write',LABEL=>$FORM{WRITE_OID}}) if $FORM{WRITE_OID};
-    $Nms->obj_oids_add({SECTION=>'reboot',LABEL=>$FORM{REBOOT_OID}}) if $FORM{REBOOT_OID};
-  }
-  my $heads = $Nms->oids_list({
-    OBJECTID  => $FORM{OBJECTID},
-    LABEL     => '_SHOW',
-    SECTION   => '_SHOW',
-    TYPE      => '_SHOW',
-    LIST2HASH => 'type,section'
-  });
-  if ( $FORM{ID}) {
-    return oid_table_row_edit({ OID_ID => $FORM{ID}, OBJECTID => $FORM{OBJECTID} });
-  }
-  elsif ( $FORM{OID} ) {
-    my $sect = $SNMP::MIB{$FORM{OID}}{parent}{label};
-    my $id_num = $Nms->obj_oids_add({
-      LABEL    => $FORM{OID},
-      SECTION  => $sect,
-      TYPE     => $FORM{visual} || '',
-      OBJECTID => $FORM{OBJECTID},
-    });
-    print $id_num->{INSERT_ID};
-    return $id_num->{INSERT_ID};
-  }
-  my @header_arr = (
-    "$lang{MAIN}:index=$index&visual=INFO&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "TABLE:index=$index&visual=TABLE&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "SCALAR:index=$index&visual=SCALAR&OBJECTID=$FORM{OBJECTID}$pages_qs"
-  );
-#  foreach my $val (sort keys %$heads){
-#    push @header_arr, uc($val).":index=$index&OBJECTID=$FORM{OBJECTID}&visual=$val$pages_qs";
-#  };
-  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
-  print $html->element('div', $buttons, { class => 'navbar navbar-default' });
-  my $visual = $FORM{visual} || 'INFO';
-  if ($visual eq 'INFO') {
-    print $html->form_main({
-      CONTENT => label_w_txt('WRITE_OID', $heads->{reboot} || '', { INP => 1, ICON => 'null'}) .
-                 label_w_txt('REBOOT_OID', $heads->{write} || '', { INP => 1, ICON => 'null'}) .
-                 label_w_txt(undef, $html->form_input( 'SAVE', $lang{SAVE}, {TYPE => 'SUBMIT'})),
-      METHOD  => 'GET',
-    	HIDDEN  => {
-      				'index'    => $index,
-      				'OBJECTID'   => $FORM{OBJECTID} || '',
-    				},
-      class => 'form-horizontal'
-  	});
-    print qq(
-      <script>
-        jQuery('input.form-control').keyup(function() {
-          var myClass = jQuery(this).next('span').attr("class");
-          if(myClass == "null form-control-feedback")
-            jQuery(this).next('span').removeClass().toggleClass('glyphicon glyphicon-floppy-disk form-control-feedback');
-        });
-      </script>
-    );
-  }
-  elsif ($FORM{visual}) {
-    oids_edit({ TYPE => $visual, OBJECTID  => $FORM{OBJECTID} });
-  }
-  return 1;
-}
-
-#**********************************************************
-
-=head2 oid_edit()
-
-=cut
-
-#**********************************************************
-sub oids_edit {
-
-  my ($attr) = @_;
-
   if ( $FORM{del} ) {
     $Nms->oid_del($FORM{del});
   }
@@ -1249,42 +1174,67 @@ sub oids_edit {
     print qq(
       <script>
         function addLink(oid,type){
-          var link = '?get_index=oids_set&header=2&OBJECTID=$attr->{OBJECTID}';
+          var link = '?get_index=oids_set&header=2&OBJECTID=$FORM{OBJECTID}';
           if ( type === 'table'){
-            jQuery.get(link + '&OID=' + oid + '&visual=' + type, function(data){
-              loadRawToModal(link + '&ID=' + data);
+            jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
+              alert(data);
+              loadRawToModal(link + '&chg=' + data);
             });
           }
           else {
-            jQuery.get(link + '&OID=' + oid + '&visual=' + type);
+            jQuery.get(link + '&OID=' + oid + '&oid_type=' + type);
           }
         };
       </script>
       );
     return 1;
   }
-  else {
-    $LIST_PARAMS{OBJECTID} = $attr->{OBJECTID};
-    $LIST_PARAMS{TYPE} = $attr->{TYPE};
-    result_former({
-      INPUT_DATA      => $Nms,
-      FUNCTION        => 'oids_list',
-      DEFAULT_FIELDS  => 'SECTION,LABEL,IID,TYPE,ACCESS',
-      FUNCTION_FIELDS => ($FORM{visual} eq 'table')? ":change:id;objectid,del" : 'del',
-      HIDDEN_FIELDS   => 'ID,OBJECTID',
-      EXT_TITLES      => {
-        type     => "$lang{TYPE}",
-       },
-      SKIP_USER_TITLE => 1,
-      TABLE           => {
-       qs   => "$pages_qs&OBJECTID=$attr->{OBJECTID}&visual=$attr->{TYPE}",
-       ID   => 'OID_LIST',
-       MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$attr->{OBJECTID}&visual=$attr->{TYPE}&add=1:add",
-      },
-      MAKE_ROWS => 1,
-      TOTAL     => 1
-    });
+  if ( $FORM{chg}) {
+    return oid_table_row_edit({ OID_ID => $FORM{chg}, OBJECTID => $FORM{OBJECTID} });
   }
+
+  if ($FORM{OID} ) {
+    my $sect = $SNMP::MIB{$FORM{OID}}{parent}{label};
+    my $id_num = $Nms->obj_oids_add({
+      LABEL    => $FORM{OID},
+      SECTION  => $sect,
+      TYPE     => $FORM{oid_type} || '',
+      OBJECTID => $FORM{OBJECTID},
+    });
+    print $id_num->{INSERT_ID};
+    return 1
+  }
+
+  my @header_arr = (
+    "$lang{MAIN}:index=$index&oid_type=MAIN&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "TABLE:index=$index&oid_type=table&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "SCALAR:index=$index&oid_type=SCALAR&OBJECTID=$FORM{OBJECTID}$pages_qs"
+  );
+
+  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
+  print $html->element('div', $buttons, { class => 'navbar navbar-default' });
+  my $type = $FORM{oid_type} || 'MAIN';
+  $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+  $LIST_PARAMS{TYPE} = $type;
+  result_former({
+    INPUT_DATA      => $Nms,
+    FUNCTION        => 'oids_list',
+    DEFAULT_FIELDS  => 'SECTION,LABEL,IID,TYPE,ACCESS',
+    FUNCTION_FIELDS => ($type eq 'table' || $type eq 'MAIN')? "change,del" : 'del',
+    HIDDEN_FIELDS   => 'ID,OBJECTID',
+    EXT_TITLES      => {
+      type     => "$lang{TYPE}",
+     },
+    SKIP_USER_TITLE => 1,
+    TABLE           => {
+     qs   => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
+     ID   => 'OID_LIST',
+     MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type&add=1:add",
+    },
+    MAKE_ROWS => 1,
+    TOTAL     => 1
+  });
+
   return 1;
 }
 
@@ -1336,8 +1286,7 @@ sub oid_table_row_edit {
   my @colls;
   foreach my $coll (@{$SNMP::MIB{$oid->{label}}{children}[0]{children}}) {
     my $state = ( exists $rows->{$coll->{label}} ) ? 1 : undef ;
-    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }) .
-    "  " . $html->element('span', '', { class => '' }), {CTRL => 1} );
+    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }),{LCOL => 3} );
   }
 	print $html->element('div', $html->element('h4', $oid->{label}, { class => 'modal-title' }),
     { class => 'modal-header' });
@@ -1354,12 +1303,12 @@ sub oid_table_row_edit {
          jQuery(':checkbox').change(function(){
              var link = '?get_index=oids_set&header=2&OBJECTID=$attr->{OBJECTID}';
              if(jQuery(this).prop('checked')) {
-               jQuery.get(link + '&ID=$attr->{OID_ID}' + '&ADD=' + jQuery(this).prop('id'), function(data){
+               jQuery.get(link + '&chg=$attr->{OID_ID}' + '&ADD=' + jQuery(this).prop('id'), function(data){
                  //alert(data);
                });
              }
              else {
-               jQuery.get(link + '&ID=$attr->{OID_ID}' + '&OID_DEL=' + jQuery(this).prop('id'), function(data){
+               jQuery.get(link + '&chg=$attr->{OID_ID}' + '&OID_DEL=' + jQuery(this).prop('id'), function(data){
                  //alert(data);
                });
              }
