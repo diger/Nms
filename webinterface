@@ -736,6 +736,7 @@ sub nms_snmp_stats {
 sub label_w_txt {
 	my ($label,$text,$attr) = @_;
 	my $class = ($attr->{COLOR}) ? "label-$attr->{COLOR}" : '' ;
+  $class = ($attr->{ICON})? ' has-feedback' : '' ;
   my $flabel =  $html->element(($attr->{INP})? 'span' : 'label', $label, {
     class => 'control-label col-sm-' . ($attr->{LCOL}||'2'),
     for => $attr->{ID} || $label
@@ -745,11 +746,17 @@ sub label_w_txt {
     id => $attr->{ID} || $label,
     name => $attr->{ID} || $label,
     type => $attr->{TYPE} || undef,
-    placeholder => ($attr->{INP})? $text : undef
+    value => $attr->{VAL} || undef,
+    placeholder => ($attr->{HOLDER})? $attr->{HOLDER} : undef
   });
-  $ftext =  $html->element('div', $ftext, { class => 'col-sm-' . ($attr->{RCOL}||'3') . $class });
+  $ftext .= $html->element('span', undef,
+    {
+      id    => $attr->{ID} || $label,
+      class => $attr->{ICON} . ' form-control-feedback'
+    }) if $attr->{ICON};
+  $ftext = $html->element('div', $ftext, { class => 'col-sm-' . ($attr->{RCOL}||'3') . $class });
 	
-	return $html->element('div', $flabel.$ftext, { class => 'form-group' });
+	return $html->element('div', $flabel.$ftext, { class => 'form-group' . $class });
 }
 #**********************************************************
 
@@ -1158,6 +1165,10 @@ sub oids_set {
   my ($attr) = @_;
 
   load_mibs({ OBJECTID => $FORM{OBJECTID} });
+  if ( $FORM{SAVE} ) {
+    $Nms->obj_oids_add({SECTION=>'write',LABEL=>$FORM{WRITE_OID}}) if $FORM{WRITE_OID};
+    $Nms->obj_oids_add({SECTION=>'reboot',LABEL=>$FORM{REBOOT_OID}}) if $FORM{REBOOT_OID};
+  }
   my $heads = $Nms->oids_list({
     OBJECTID  => $FORM{OBJECTID},
     LABEL     => '_SHOW',
@@ -1191,16 +1202,24 @@ sub oids_set {
   print $html->element('div', $buttons, { class => 'navbar navbar-default' });
   my $visual = $FORM{visual} || 'INFO';
   if ($visual eq 'INFO') {
-    print $html->element('div', label_w_txt('Write OID', $heads->{reboot} || '').'<br>' .
-    label_w_txt('Reboot OID', $heads->{write} || ''), { class => 'col-md-4' });
+    print $html->form_main({
+      CONTENT => label_w_txt('WRITE_OID', $heads->{reboot} || '', { INP => 1, ICON => 'null'}) .
+                 label_w_txt('REBOOT_OID', $heads->{write} || '', { INP => 1, ICON => 'null'}) .
+                 label_w_txt(undef, $html->form_input( 'SAVE', $lang{SAVE}, {TYPE => 'SUBMIT'})),
+      METHOD  => 'GET',
+    	HIDDEN  => {
+      				'index'    => $index,
+      				'OBJECTID'   => $FORM{OBJECTID} || '',
+    				},
+      class => 'form-horizontal'
+  	});
     print qq(
       <script>
-        function turnTextIntoInputField(inputOID,value) {
-          var val = prompt(inputOID, value);
-          if (val != value) {
-            document.location = 'index.cgi?index=$index$pages_qs&visual=INFO&OID=' + inputOID + '&VAL=' + val;
-          }
-        }
+        jQuery('input.form-control').keyup(function() {
+          var myClass = jQuery(this).next('span').attr("class");
+          if(myClass == "null form-control-feedback")
+            jQuery(this).next('span').removeClass().toggleClass('glyphicon glyphicon-floppy-disk form-control-feedback');
+        });
       </script>
     );
   }

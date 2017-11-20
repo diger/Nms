@@ -118,9 +118,9 @@ sub obj_add {
   $self->{SEARCH_FIELDS} =~ s/,\s$//;
   my $VALUES = join(',', @{$self->{SEARCH_VALUES}});
   $self->query2("INSERT INTO nms_obj ( $self->{SEARCH_FIELDS} ) VALUES
-				( $VALUES )
-				ON DUPLICATE KEY UPDATE $UPD;", 'do'
-				);
+    ( $VALUES )
+    ON DUPLICATE KEY UPDATE $UPD;", 'do'
+  );
      
   return $self;
 }
