@@ -20,6 +20,7 @@ CREATE TABLE `nms_oids` (
   `iid` smallint(5) unsigned DEFAULT NULL,
   `type` varchar(50) DEFAULT NULL,
   `access` tinyint(1) unsigned DEFAULT NULL,
+  `value` tinyint(3) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `lab_i_obj` (`label`,`iid`,`objectid`),
   KEY `objectid` (`objectid`),

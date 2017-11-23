@@ -28,7 +28,7 @@ load_pmodule2('SNMP');
 
 SNMP::addMibDirs( '../../var/snmp/mibs' );
 SNMP::addMibDirs( '../../var/snmp/mibs/private' );
-SNMP::initMib();
+#SNMP::initMib();
 
 my %snmpparms;
 $snmpparms{Version} = 2;
@@ -101,8 +101,8 @@ sub nms_obj {
                         label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
                         label_w_txt('SYS_OBJECTID', $html->element('a', $oid_hash->{$nms->[0]->{sysobjectid}},
                         { href => "index.cgi?index=" . $so_index . "&SYSOBJECTID=" . $nms->[0]->{sysobjectid} })).
-                        label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>1}).
-                        label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>1}).
+                        label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>'input'}).
+                        label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>'input'}).
                         label_w_txt($lang{STATUS}, $STATUS).
                         label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
                             TYPE => 'SUBMIT'
@@ -492,7 +492,7 @@ sub nms_show {
   $table->addrow($html->b('Syntax'), $SNMP::MIB{$attr->{OID}}{syntax}) if $SNMP::MIB{$attr->{OID}}{syntax};
   $table->addrow($html->b($lang{RANGE}), "$SNMP::MIB{$attr->{OID}}{ranges}[0]{low} .. $SNMP::MIB{$attr->{OID}}{ranges}[0]{high}") 
       if $SNMP::MIB{$attr->{OID}}{ranges}[0];
-  $table->addrow($html->b($lang{DESCRIBE}), $SNMP::MIB{$attr->{OID}}{TCDescription}) if $SNMP::MIB{$attr->{OID}}{TCDescription};
+  $table->addrow($html->b($lang{DESCRIBE}), $SNMP::MIB{$attr->{OID}}{description}) if $SNMP::MIB{$attr->{OID}}{description};
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
@@ -529,6 +529,7 @@ sub mibs_browser {
   $pages_qs = $pages_qs . "&ID=$ID";
   
   if ($FORM{OID}){
+    $SNMP::save_descriptions = 1;
     $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
     print nms_show({ OID => $FORM{OID}, EDIT => $ID });
     if ($FORM{GET}){
@@ -741,14 +742,33 @@ sub label_w_txt {
     class => 'control-label col-sm-' . ($attr->{LCOL}||'2'),
     for => $attr->{ID} || $label
   });
-  my $ftext =  $html->element(($attr->{INP})?'input':'p', $text, {
+  my %ex_attr = (
     class => ($attr->{INP})?'form-control':'form-control-static',
     id => $attr->{ID} || $label,
     name => $attr->{ID} || $label,
     type => $attr->{TYPE} || undef,
-    value => $attr->{VAL} || undef,
     placeholder => ($attr->{HOLDER})? $attr->{HOLDER} : undef
-  });
+  );
+  my @sels;
+  if ($attr->{SELECT} && ref($attr->{SELECT}) eq 'ARRAY'){
+    foreach my $opt (@{$attr->{SELECT}}){
+      my $op = $html->element('option', $opt, { value => $opt});
+      $op =~ s/<option /<option selected / if $text eq $opt ;
+      push @sels, $op
+    }
+    $text = "@sels";
+  }
+  elsif ($attr->{SELECT} && ref($attr->{SELECT}) eq 'HASH') {
+    while ( my ($key, $value) = each (%{$attr->{SELECT}}) ){
+      my $op = $html->element('option', $value, { value => $key});
+      $op =~ s/<option /<option selected / if $text eq $key ;
+      push @sels, $op
+    }
+    $text = "@sels";
+  }
+  $ex_attr{value} = ($attr->{INP} && $attr->{INP} eq 'input')? $text : undef;
+  $text = (!$attr->{INP} || $attr->{INP} ne 'input')? $text : '';
+  my $ftext =  $html->element(($attr->{INP})?$attr->{INP}:'p', $text, \%ex_attr);
   $ftext .= $html->element('span', undef,
     {
       id    => $attr->{ID} || $label,
@@ -916,6 +936,7 @@ sub load_mibs {
       push @mods, $val->[0];
     }
     SNMP::loadModules(@mods);
+    SNMP::initMib();
   
     return $nms->[0] if $attr->{ID};
   }
@@ -1168,16 +1189,45 @@ sub oids_set {
   if ( $FORM{del} ) {
     $Nms->oid_del($FORM{del});
   }
+  my $type = $FORM{oid_type} || 'main';
+  
+  if ( $FORM{chg} && $type ne 'main') {
+    return oid_table_row_edit({ OID_ID => $FORM{chg}, OBJECTID => $FORM{OBJECTID} });
+  }
 
-  if ( $FORM{add}  || $FORM{ID} ) {
-    print mibs_browser({EDIT => 1});
+  if ($FORM{OID} ) {
+    my $sect = ($FORM{TYPE})? $FORM{TYPE} : $SNMP::MIB{$FORM{OID}}{parent}{label};
+    my $id_num = $Nms->obj_oids_add({
+      ID       => $FORM{OID_ID} || '',
+      LABEL    => $FORM{OID},
+      SECTION  => $sect,
+      TYPE     => $FORM{oid_type} || '',
+      OBJECTID => $FORM{OBJECTID},
+      VALUE    => $FORM{VALUE},
+    });
+    if (!$FORM{TYPE}){
+      print $id_num->{INSERT_ID};
+      return 1
+    }
+  }
+
+  my @header_arr = (
+    "$lang{MAIN}:index=$index&oid_type=main&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "TABLE:index=$index&oid_type=table&OBJECTID=$FORM{OBJECTID}$pages_qs",
+    "SCALAR:index=$index&oid_type=scalar&OBJECTID=$FORM{OBJECTID}$pages_qs"
+  );
+
+  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
+  print $html->element('div', $buttons, { class => 'navbar navbar-default' });
+  
+  if ( ($FORM{add}  || $FORM{ID}) && $type ne 'main') {
+    mibs_browser({EDIT => 1});
     print qq(
       <script>
         function addLink(oid,type){
           var link = '?get_index=oids_set&header=2&OBJECTID=$FORM{OBJECTID}';
           if ( type === 'table'){
             jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
-              alert(data);
               loadRawToModal(link + '&chg=' + data);
             });
           }
@@ -1187,53 +1237,77 @@ sub oids_set {
         };
       </script>
       );
-    return 1;
   }
-  if ( $FORM{chg}) {
-    return oid_table_row_edit({ OID_ID => $FORM{chg}, OBJECTID => $FORM{OBJECTID} });
-  }
-
-  if ($FORM{OID} ) {
-    my $sect = $SNMP::MIB{$FORM{OID}}{parent}{label};
-    my $id_num = $Nms->obj_oids_add({
-      LABEL    => $FORM{OID},
-      SECTION  => $sect,
-      TYPE     => $FORM{oid_type} || '',
-      OBJECTID => $FORM{OBJECTID},
+  else{
+    $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+    $LIST_PARAMS{TYPE} = $type;
+    $LIST_PARAMS{ID} = $FORM{chg} || '_SHOW';
+    my ($table,$list) = result_former({
+      INPUT_DATA      => $Nms,
+      FUNCTION        => 'oids_list',
+      DEFAULT_FIELDS  => 'SECTION,LABEL,IID,TYPE,ACCESS,VALUE',
+      FUNCTION_FIELDS => ($type eq 'table' || $type eq 'main')? "change,del" : 'del',
+      HIDDEN_FIELDS   => 'ID,OBJECTID',
+      EXT_TITLES      => {
+        type     => "$lang{TYPE}",
+       },
+      SKIP_USER_TITLE => 1,
+      TABLE           => {
+       qs   => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
+       ID   => 'OID_LIST',
+       MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type&add=1:add",
+      },
+      MAKE_ROWS => 1,
+      TOTAL     => 1,
+      OUTPUT2RETURN     => 1
     });
-    print $id_num->{INSERT_ID};
-    return 1
+    if ( ($FORM{add} || $FORM{chg} )  && $type eq 'main' ) {
+      my %labels;
+      foreach my $oid (keys(%SNMP::MIB)) {
+        if  ( $SNMP::MIB{$oid}{label} =~ /Reset/ || $SNMP::MIB{$oid}{label} =~ /Write/
+        || $SNMP::MIB{$oid}{label} =~ /Save/ && !$SNMP::MIB{$oid}{children}[0]{label} ) {
+          my %enums = oid_enums($SNMP::MIB{$oid}{label});
+          $labels{$SNMP::MIB{$oid}{label}} = \%enums;
+        }
+      }
+      my $vals = JSON->new->indent->encode(\%labels);
+      my @keys = sort keys %labels;
+      print $html->form_main({
+      	CONTENT =>  label_w_txt('TYPE',$list->[0]->{section}, {INP=>'select', SELECT => ['write', 'reboot']}).
+                    label_w_txt('OID',$list->[0]->{label}, {INP=>'select', SELECT => \@keys}).
+                    label_w_txt('VALUE', $list->[0]->{value}|| 0, {INP=>'select', SELECT => $labels{$list->[0]->{label}}}).
+                    label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
+                        TYPE => 'SUBMIT'
+                      }) . "	" .
+  											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+  								  {RCOL => 3}),
+  	    METHOD  => 'GET',
+      	HIDDEN  => {
+          'index'    => $index,
+          'oid_type' => 'main',
+          'OBJECTID' => $FORM{OBJECTID},
+          'OID_ID' => $FORM{chg}
+       },
+        class => 'form-horizontal'
+    	});
+      print qq(
+        <script>
+        var selectValues = $vals;
+        jQuery('select#OID').on('change', function() {
+          jQuery('select#VALUE').empty();
+          var result ='';
+          jQuery.each(selectValues[this.value], function(key, value) {
+            jQuery('select#VALUE').append('<option value=' + key + '>' + value + '<option>');
+          });
+          jQuery('select#VALUE').trigger("chosen:updated");
+        });
+        </script>
+      );
+    }
+    else {
+      print $table
+    }
   }
-
-  my @header_arr = (
-    "$lang{MAIN}:index=$index&oid_type=MAIN&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "TABLE:index=$index&oid_type=table&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "SCALAR:index=$index&oid_type=SCALAR&OBJECTID=$FORM{OBJECTID}$pages_qs"
-  );
-
-  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
-  print $html->element('div', $buttons, { class => 'navbar navbar-default' });
-  my $type = $FORM{oid_type} || 'MAIN';
-  $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
-  $LIST_PARAMS{TYPE} = $type;
-  result_former({
-    INPUT_DATA      => $Nms,
-    FUNCTION        => 'oids_list',
-    DEFAULT_FIELDS  => 'SECTION,LABEL,IID,TYPE,ACCESS',
-    FUNCTION_FIELDS => ($type eq 'table' || $type eq 'MAIN')? "change,del" : 'del',
-    HIDDEN_FIELDS   => 'ID,OBJECTID',
-    EXT_TITLES      => {
-      type     => "$lang{TYPE}",
-     },
-    SKIP_USER_TITLE => 1,
-    TABLE           => {
-     qs   => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
-     ID   => 'OID_LIST',
-     MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type&add=1:add",
-    },
-    MAKE_ROWS => 1,
-    TOTAL     => 1
-  });
 
   return 1;
 }
@@ -1286,7 +1360,7 @@ sub oid_table_row_edit {
   my @colls;
   foreach my $coll (@{$SNMP::MIB{$oid->{label}}{children}[0]{children}}) {
     my $state = ( exists $rows->{$coll->{label}} ) ? 1 : undef ;
-    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }),{LCOL => 3} );
+    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }),{LCOL => 2} );
   }
 	print $html->element('div', $html->element('h4', $oid->{label}, { class => 'modal-title' }),
     { class => 'modal-header' });

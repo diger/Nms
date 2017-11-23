@@ -162,6 +162,7 @@ sub oids_list {
 	  ['IID',      'INT', 'iid',      1 ],
 	  ['TYPE',     'STR', 'type',     1 ],
 	  ['ACCESS',   'STR', 'access',   1 ],
+    ['VALUE',    'INT', 'value',    1 ],
     ],
     { WHERE => 1,
     }
