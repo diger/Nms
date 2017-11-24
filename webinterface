@@ -83,6 +83,35 @@ sub nms_obj {
     %LIST_PARAMS,
   });
   
+  if ( $FORM{SET} ) {
+    load_mibs({ ID => $FORM{ID} });
+    my %enums = oid_enums($FORM{SET});
+    print $html->form_main({
+      CONTENT =>
+        label_w_txt('LABEL',$FORM{SET}).
+        label_w_txt('VALUE', $FORM{VAL}|| 0, {
+          INP    => (oid_enums($FORM{SET}))? 'select' : 'input',
+          SELECT => (oid_enums($FORM{SET}))? \%enums : '',
+          RCOL => 8
+        }).
+        label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
+            TYPE => 'SUBMIT'
+          }) . "	" .
+						$html->button( $lang{CANCEL}, undef,{
+              SKIP_HREF => 1,
+              ex_params =>qq/data-dismiss='modal'/,
+              class => 'btn btn-default' }), {RCOL => 8}),
+	    METHOD  => 'GET',
+    	HIDDEN  => {
+        'index'  => $index,
+        'visual' => 'INFO',
+        'ID'     => $FORM{ID},
+        'LABEL'  => $FORM{SET}
+     },
+      class => 'form-horizontal'
+  	});
+    return 1
+  }
   if (($FORM{WRITE} || $FORM{RESET}) && $FORM{ID}){
     my $obj = load_mibs({ ID => $FORM{ID} });
     my $param = $Nms->oids_list({
@@ -294,11 +323,11 @@ sub nms_obj_data {
       IID       => '_SHOW',
     }
   );
-  if ( $FORM{OID} && $FORM{VAL} ) {
+  
+  if ( $FORM{LABEL} && $FORM{VALUE} ) {
     $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
     my $sess = SNMP::Session->new(DestHost => $prm->{ip}, %snmpparms);
-    #my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-    my $vb = SNMP::Varbind->new([$FORM{OID},$FORM{IID}||0,$FORM{VAL}]);
+    my $vb = SNMP::Varbind->new([$FORM{LABEL},$FORM{IID}||0,$FORM{VALUE}]);
     $sess->set($vb);
     if ( $sess->{ErrorNum} ) {
       return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
@@ -336,20 +365,20 @@ sub nms_obj_data {
       NO_LINK_FORMER => 1,
       class          => "change",
       title          => $lang{ADD},
-      ex_params      => qq/onclick=\"turnTextIntoInputField('$val->[0]','$val->[2]')\"/
+      ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&visual=INFO&SET=$val->[0]&VAL=$val->[2]')\"/
     }) :'';
   $table->addrow($html->b($val->[0]), $val->[2], $edit);
   }
-  print qq(
-    <script>
-      function turnTextIntoInputField(inputOID,value) {
-        var val = prompt(inputOID, value);
-        if (val != value) {
-          document.location = 'index.cgi?index=$index$pages_qs&visual=INFO&OID=' + inputOID + '&VAL=' + val;
-        }
-      }
-    </script>
-  );
+#  print qq(
+#    <script>
+#      function turnTextIntoInputField(inputOID,value) {
+#        var val = prompt(inputOID, value);
+#        if (val != value) {
+#          document.location = 'index.cgi?index=$index$pages_qs&visual=INFO&OID=' + inputOID + '&VAL=' + val;
+#        }
+#     }
+#    </script>
+#  );
   print $table->show();
 
   return 1;
