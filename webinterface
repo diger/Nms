@@ -82,6 +82,7 @@ sub nms_obj {
     COLS_NAME    => 1,
     %LIST_PARAMS,
   });
+  
   if (($FORM{WRITE} || $FORM{RESET}) && $FORM{ID}){
     my $obj = load_mibs({ ID => $FORM{ID} });
     my $param = $Nms->oids_list({
@@ -119,7 +120,13 @@ sub nms_obj {
                         { href => "index.cgi?index=" . $so_index . "&SYSOBJECTID=" . $nms->[0]->{sysobjectid} })).
                         label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>'input'}).
                         label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>'input'}).
-                        label_w_txt($lang{STATUS}, $STATUS).
+                        label_w_txt($lang{STATUS},$nms->[0]->{status} || 0, {
+                          INP=>'select',
+                          SELECT => {
+                            0 => $lang{ENABLED},
+                            1 => $lang{DISABLED}
+                          }
+                        }).
                         label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
                             TYPE => 'SUBMIT'
                           }) . "	" .
@@ -1255,7 +1262,7 @@ sub oids_set {
           var link = '?get_index=oids_set&header=2&OBJECTID=$FORM{OBJECTID}';
           if ( type === 'table'){
             jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
-              loadRawToModal(link + '&chg=' + data);
+              loadRawToModal(link + '&oid_type=' + type + '&chg=' + data);
             });
           }
           else {
