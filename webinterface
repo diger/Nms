@@ -82,6 +82,22 @@ sub nms_obj {
     COLS_NAME    => 1,
     %LIST_PARAMS,
   });
+  if (($FORM{WRITE} || $FORM{RESET}) && $FORM{ID}){
+    my $obj = load_mibs({ ID => $FORM{ID} });
+    my $param = $Nms->oids_list({
+      ID        => $FORM{WRITE} || $FORM{RESET},
+      LABEL     => '_SHOW',
+      VALUE     => '_SHOW',
+      COLS_NAME => 1,
+    });
+    $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
+    my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
+    my $vb = SNMP::Varbind->new([$param->[0]->{label},$param->[0]->{iid}||0,$param->[0]->{value}]);
+    $sess->set($vb);
+    if ( $sess->{ErrorNum} ) {
+      return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
+    }
+  }
   if ( $FORM{chg} ) {
   	my $STATUS = $html->form_select(
       'STATUS',
@@ -123,16 +139,27 @@ sub nms_obj {
     my $obj_id = $FORM{ID} || $nms->[0]->{id};
     $pages_qs .= "&ID=$obj_id";
     my @header_arr = ("$lang{MAIN}:index=$index&visual=INFO$pages_qs");
-    my $heads = $Nms->oids_list({
+    my $oids = $Nms->oids_list({
       OBJECTID  => $nms->[0]->{sysobjectid},
       LABEL     => '_SHOW',
       SECTION   => '_SHOW',
-      TYPE      => 'table',
+      TYPE      => '_SHOW',
       COLS_NAME => 1,
       GROUP     => 'section'
     });
-    foreach my $val (@$heads){
-      push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs";
+    my @main_btn;
+    foreach my $val (@$oids){
+      push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs" if $val->{type} eq 'table';
+      push @main_btn, $html->button( $lang{RESTART}, "index=$index$pages_qs&RESET=$val->{id}",{
+        CONFIRM   => "$lang{RESTART} $nms->[0]->{ip} ?",
+        ICON      => 'glyphicon glyphicon-repeat text-danger',
+        class     => 'btn btn-default'
+      }) if $val->{section} eq 'reboot';
+      push @main_btn, $html->button( $lang{SAVE}, "index=$index$pages_qs&WRITE=$val->{id}",{
+        CONFIRM   => "$lang{SAVE} $lang{SETTINGS} $nms->[0]->{ip} ?",
+        ICON      => 'glyphicon glyphicon-floppy-save text-info',
+        class     => 'btn btn-default'
+      }) if $val->{section} eq 'write';
     };
  #   if ( $Equipment->graph_list({ OBJ_ID => $obj_id }) ) {
       push @header_arr, "$lang{STATS}:index=$index&visual=STATS$pages_qs";
@@ -161,10 +188,10 @@ sub nms_obj {
            MAIN_MENU_ARGV => "chg=" . ($obj_id || '')
          }
        );
-
+     
       my $obj_select_form = $html->form_main(
          {
-           CONTENT => $obj_select,
+           CONTENT => $obj_select . "@main_btn",
            HIDDEN  => {
              'index'  => $index,
              'visual' => $FORM{visual} || 0,
@@ -1265,7 +1292,8 @@ sub oids_set {
       my %labels;
       foreach my $oid (keys(%SNMP::MIB)) {
         if  ( $SNMP::MIB{$oid}{label} =~ /Reset/ || $SNMP::MIB{$oid}{label} =~ /Write/
-        || $SNMP::MIB{$oid}{label} =~ /Save/ && !$SNMP::MIB{$oid}{children}[0]{label} ) {
+        || $SNMP::MIB{$oid}{label} =~ /Save/ || $SNMP::MIB{$oid}{label} =~ /Reboot/
+        && !$SNMP::MIB{$oid}{children}[0]{label} ) {
           my %enums = oid_enums($SNMP::MIB{$oid}{label});
           $labels{$SNMP::MIB{$oid}{label}} = \%enums;
         }
@@ -1273,14 +1301,18 @@ sub oids_set {
       my $vals = JSON->new->indent->encode(\%labels);
       my @keys = sort keys %labels;
       print $html->form_main({
-      	CONTENT =>  label_w_txt('TYPE',$list->[0]->{section}, {INP=>'select', SELECT => ['write', 'reboot']}).
-                    label_w_txt('OID',$list->[0]->{label}, {INP=>'select', SELECT => \@keys}).
-                    label_w_txt('VALUE', $list->[0]->{value}|| 0, {INP=>'select', SELECT => $labels{$list->[0]->{label}}}).
-                    label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
-                        TYPE => 'SUBMIT'
-                      }) . "	" .
-  											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
-  								  {RCOL => 3}),
+      	CONTENT =>  
+          label_w_txt('TYPE',$list->[0]->{section}|| 'write', {INP=>'select', SELECT => ['write', 'reboot']}).
+          label_w_txt('OID',$list->[0]->{label}|| 0, {INP=>'select', SELECT => \@keys}).
+          label_w_txt('VALUE', $list->[0]->{value}|| 0, {
+            INP    =>'select',
+            SELECT => ($list->[0]->{label}) ? $labels{$list->[0]->{label}} : ''
+          }).
+          label_w_txt(undef, $html->form_input( 'SAVE', ($FORM{chg})? $lang{CHANGE} : $lang{CREATE}, {
+              TYPE => 'SUBMIT'
+            }) . "	" .
+							$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+				  {RCOL => 3}),
   	    METHOD  => 'GET',
       	HIDDEN  => {
           'index'    => $index,
