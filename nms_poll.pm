@@ -33,6 +33,7 @@ my %snmpparms;
 $snmpparms{Community} = $SNMP_COMMUNITY;
 $snmpparms{Version} = 2;
 $snmpparms{Retries} = 1;
+$snmpparms{UseSprintValue} = 0;
 $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 
 my $Nms = Nms->new( $db, $Admin, \%conf );
@@ -67,6 +68,7 @@ if ($argv->{INIT}) {
 if ($argv->{PING}) {
   nms_ping();
 }
+
 nms_poll();
 
 #**********************************************************
@@ -97,7 +99,6 @@ sub nms_poll {
     IP           => $argv->{NAS_IPS} || '_SHOW',
   } );
 
-  my %values;
   my $vl = new SNMP::VarList(['sysObjectID', 0],
                              ['sysDescr', 0],
                              ['sysName', 0],
@@ -107,7 +108,6 @@ sub nms_poll {
   if ($argv->{DISC}) {
 	  my $ip = new Net::IP( $argv->{IPS} || $conf{NMS_NET});
 	  do {
-		  $snmpparms{UseSprintValue} = 0;
       $snmpparms{DestHost} = $ip->ip();
 		  $sess = new SNMP::Session(%snmpparms);
 		  print $ip->ip() . "\n" if $debug > 0;
@@ -121,9 +121,21 @@ sub nms_poll {
       }) if (@result && $debug < 2);
 	  } while (++$ip);
   }
-  if ($argv->{MOD}) {
-	  foreach my $obj (@$obj_list) {
-		  $snmpparms{UseSprintValue} = 0;
+
+  foreach my $obj (@$obj_list) {
+
+    my $stats = $Nms->triggers_list({
+      COLS_NAME => 1,
+      OBJ_ID    => $obj->{id},
+      LABEL     => '_SHOW',
+      IID       => '_SHOW'
+    });
+    
+    if ($argv->{STATS} && $stats) {
+      stats($obj->{ip}, $stats);
+    }
+    
+    if ($argv->{MOD}) {
       $snmpparms{DestHost} = $obj->{ip};
 		  $sess = new SNMP::Session(%snmpparms);
 		  print $obj->{ip} . "\n" if $debug > 0;
@@ -152,41 +164,6 @@ sub nms_poll {
           }) if $debug < 1;
         }
       }
-	  } 
-  }
-  foreach my $obj (@$obj_list) {
-
-    my $stats = $Nms->triggers_list({
-      COLS_NAME => 1,
-      OBJ_ID    => $obj->{id},
-      LABEL     => '_SHOW',
-      IID       => '_SHOW'
-    });
-
-=comm
-	if ($argv->{FIX}) {
-	  $snmpparms{UseSprintValue} = 1;
-	  $snmpparms{UseNumeric} = 1;
-	  $snmpparms{UseEnums} = 1;
-	  $snmpparms{DestHost} = $obj->{ip};
-	  $sess = new SNMP::Session(%snmpparms);
-	  my @vals = $sess->get( $vars );
-	  
-	  print $obj->{ip} . "\n" if $debug > 0;
-	  foreach my $val (@$oids) {
-		  if (!($val->[2] =~ 'No Such Object' || $val->[2] =~ 'Wrong Type')){
-			  $Nms->obj_values_add({
-				  OBJ_ID => $obj->{id},
-				  OID_ID  => $oids{$val->[0]},
-				  OBJ_IND  => $val->[1],
-				  VALUE  => $val->[2],
-			  });
-		  }
-	  }
-    }
-=cut	
-	if ($argv->{STATS} && $stats) {
-      stats($obj->{ip}, $stats);
     }
   }
 
@@ -230,7 +207,6 @@ sub nms_ping {
 
   my %list;
   my $var;
-  my $id;
 
   foreach my $obj (@$obj_list) {
     $sess = SNMP::Session->new(
@@ -242,12 +218,7 @@ sub nms_ping {
     );
 
     my $vb = new SNMP::Varbind(['sysUpTime']);
-
-    # The responses to our queries are stored in %list.
     $var = $sess->getnext($vb, [ \&gotit, $obj->{id}, \%list ]);
-
-    # Update the rate limiting counter.
-    $id++;
 
     # After every 100 IP's, wait for the timeout period (default is two seconds) to keep from overwhelming routers with ARP queries.
 #    if ( $id > 100 ) {

@@ -61,7 +61,7 @@ sub nms_obj {
       ID           => $FORM{OBJ_ID},
       RW_COMMUNITY => $FORM{Rw_COMMUNITY},
       RO_COMMUNITY => $FORM{RO_COMMUNITY},
-      STATUS       => $FORM{STATUS},
+      STATUS       => $FORM{STATUS} || 0,
     })
   }
   
@@ -150,7 +150,8 @@ sub nms_obj {
                         label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>'input'}).
                         label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>'input'}).
                         label_w_txt($lang{STATUS},$nms->[0]->{status} || 0, {
-                          INP=>'select',
+                          ID     =>'STATUS',
+                          INP    =>'select',
                           SELECT => {
                             0 => $lang{ENABLED},
                             1 => $lang{DISABLED}
@@ -197,9 +198,9 @@ sub nms_obj {
         class     => 'btn btn-default'
       }) if $val->{section} eq 'write';
     };
- #   if ( $Equipment->graph_list({ OBJ_ID => $obj_id }) ) {
+    if ( $Nms->triggers_list({ OBJ_ID => $obj_id }) ) {
       push @header_arr, "$lang{STATS}:index=$index&visual=STATS$pages_qs";
- #   }
+    }
     push @header_arr, "MIBs Browser:index=$index&visual=MIB_BR$pages_qs";
     
     my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
