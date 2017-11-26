@@ -104,7 +104,7 @@ sub obj_add {
 
   my $UPD =  $self->search_former($attr,
     [
-    ['IP',           'IP',  'ip',                      1 ],
+    ['IP',           'STR', 'ip',                      1 ],
     ['SYS_NAME',     'STR', 'sysname',                 1 ],
     ['SYS_LOCATION', 'STR', 'syslocation',             1 ],
     ['SYS_OBJECTID', 'STR', 'sysobjectid',             1 ],
@@ -115,6 +115,7 @@ sub obj_add {
     ]
   );
   $UPD =~ s/AND/,/g;
+  $UPD =~ s/\(|\)//g;
   $self->{SEARCH_FIELDS} =~ s/,\s$//;
   my $VALUES = join(',', @{$self->{SEARCH_VALUES}});
   $self->query2("INSERT INTO nms_obj ( $self->{SEARCH_FIELDS} ) VALUES

@@ -8,7 +8,7 @@ CREATE TABLE `nms_obj` (
   `ro_community` blob,
   `rw_community` blob,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `ip_sys` (`ip`,`sysobjectid`)
+  UNIQUE KEY `ip` (`ip`)
 ) COMMENT='Equipment objects';
 
 
@@ -24,7 +24,7 @@ CREATE TABLE `nms_oids` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `lab_i_obj` (`label`,`iid`,`objectid`),
   KEY `objectid` (`objectid`),
-  CONSTRAINT `nms_oids_ibfk_1` FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE
+  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE
 ) COMMENT='Equipment OIDS table';
 
 
@@ -37,7 +37,7 @@ CREATE TABLE `nms_oids_rows` (
   `access` tinyint(1) unsigned DEFAULT NULL,
   UNIQUE KEY `id_lab` (`id`,`label`),
   KEY `id` (`id`),
-  CONSTRAINT `nms_oids_rows_ibfk_1` FOREIGN KEY (`id`) REFERENCES `nms_oids` (`id`) ON DELETE CASCADE
+  FOREIGN KEY (`id`) REFERENCES `nms_oids` (`id`) ON DELETE CASCADE
 ) COMMENT='Equipment OIDS table rows';
 
 
@@ -54,7 +54,7 @@ CREATE TABLE `nms_trap_values` (
   `label` varchar(50) NOT NULL DEFAULT '',
   `value` varbinary(100) NOT NULL DEFAULT '',
   KEY `id` (`id`),
-  CONSTRAINT `nms_trap_values_ibfk_1` FOREIGN KEY (`id`) REFERENCES `nms_traps` (`id`) ON DELETE CASCADE
+  FOREIGN KEY (`id`) REFERENCES `nms_traps` (`id`) ON DELETE CASCADE
 ) COMMENT='Nms trap values';
 
 
@@ -88,7 +88,7 @@ CREATE TABLE `nms_obj_triggers` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `lab_i_obj` (`label`,`iid`,`obj_id`),
   KEY `obj_id` (`obj_id`),
-  CONSTRAINT `nms_obj_triggers_ibfk_1` FOREIGN KEY (`obj_id`) REFERENCES `nms_obj` (`id`) ON DELETE CASCADE
+  FOREIGN KEY (`obj_id`) REFERENCES `nms_obj` (`id`) ON DELETE CASCADE
 ) COMMENT='Nms object triggers'
 
 

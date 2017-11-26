@@ -106,6 +106,7 @@ sub nms_poll {
                              ['sysUpTime', 0]);
 
   if ($argv->{DISC}) {
+    $snmpparms{Timeout} = 400000;
 	  my $ip = new Net::IP( $argv->{IPS} || $conf{NMS_NET});
 	  do {
       $snmpparms{DestHost} = $ip->ip();
@@ -115,9 +116,9 @@ sub nms_poll {
       print Dumper \@result if $debug > 0;
       $Nms->obj_add({ 
         IP => ip2int($ip->ip()),
-        SYSOBJECTID => $result[0],
-        SYSNAME     => $result[2],
-        SYSLOCATION => $result[3],
+        SYS_OBJECTID => $result[0],
+        SYS_NAME     => $result[2],
+        SYS_LOCATION => $result[3],
       }) if (@result && $debug < 2);
 	  } while (++$ip);
   }
