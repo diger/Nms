@@ -94,7 +94,7 @@ sub nms_obj {
           SELECT => (oid_enums($FORM{SET}))? \%enums : '',
           RCOL => 8
         }).
-        label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
+        label_w_txt(undef, $html->form_input( 'SET', $lang{CHANGE}, {
             TYPE => 'SUBMIT'
           }) . "	" .
 						$html->button( $lang{CANCEL}, undef,{
@@ -1328,9 +1328,7 @@ sub oids_set {
     if ( ($FORM{add} || $FORM{chg} )  && $type eq 'main' ) {
       my %labels;
       foreach my $oid (keys(%SNMP::MIB)) {
-        if  ( $SNMP::MIB{$oid}{label} =~ /Reset/ || $SNMP::MIB{$oid}{label} =~ /Write/
-        || $SNMP::MIB{$oid}{label} =~ /Save/ || $SNMP::MIB{$oid}{label} =~ /Reboot/
-        && !$SNMP::MIB{$oid}{children}[0]{label} ) {
+        if  ( $SNMP::MIB{$oid}{label} =~ /Reset|Write|Save|Reboot|write|reset/ && !$SNMP::MIB{$oid}{children}[0]{label} ) {
           my %enums = oid_enums($SNMP::MIB{$oid}{label});
           $labels{$SNMP::MIB{$oid}{label}} = \%enums;
         }
@@ -1364,7 +1362,6 @@ sub oids_set {
         var selectValues = $vals;
         jQuery('select#OID').on('change', function() {
           jQuery('select#VALUE').empty();
-          var result ='';
           jQuery.each(selectValues[this.value], function(key, value) {
             jQuery('select#VALUE').append('<option value=' + key + '>' + value + '<option>');
           });
