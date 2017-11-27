@@ -83,7 +83,7 @@ sub nms_obj {
     %LIST_PARAMS,
   });
   
-  if ( $FORM{SET} ) {
+  if ( $FORM{SET} && $FORM{header} ) {
     load_mibs({ ID => $FORM{ID} });
     my %enums = oid_enums($FORM{SET});
     print $html->form_main({
