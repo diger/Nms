@@ -1303,8 +1303,9 @@ sub oids_set {
        },
       SKIP_USER_TITLE => 1,
       TABLE           => {
-       qs   => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
-       ID   => 'OID_LIST',
+       qs      => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
+       ID      => 'OID_LIST',
+       caption => $SNMP::MIB{$FORM{OBJECTID}}{label},
        MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type&add=1:add",
       },
       MAKE_ROWS => 1,
