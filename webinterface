@@ -1314,7 +1314,8 @@ sub oids_set {
     if ( ($FORM{add} || $FORM{chg} )  && $type eq 'main' ) {
       my %labels;
       foreach my $oid (keys(%SNMP::MIB)) {
-        if  ( $SNMP::MIB{$oid}{label} =~ /Reset|Write|Save|Reboot|write|reset/ && !$SNMP::MIB{$oid}{children}[0]{label} ) {
+        if  ( $SNMP::MIB{$oid}{label} =~ /Reset|Write|Save|Reboot|write|reset/ && !$SNMP::MIB{$oid}{children}[0]{label}
+        && ($SNMP::MIB{$oid}{access} && $SNMP::MIB{$oid}{access} =~ /ReadWrite|WriteOnly/) ) {
           my %enums = oid_enums($SNMP::MIB{$oid}{label});
           $labels{$SNMP::MIB{$oid}{label}} = \%enums;
         }
