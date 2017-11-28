@@ -480,6 +480,7 @@ sub nms_snmp_table {
     }
   );
 
+  my $visual = ($FORM{visual})? "&visual=$FORM{visual}": '';
   foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
 	  my @row = ();
 	  foreach my $ind (@{$attr->{columns}}){
@@ -510,7 +511,7 @@ sub nms_snmp_table {
         NO_LINK_FORMER => 1,
         class          => 'change',
         title          => $lang{CHANGE},
-        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&visual=$FORM{visual}&SET=$ind&VAL=$results->{$var}->{$ind}&IID=$var')\"/
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2$visual&SET=$ind&VAL=$results->{$var}->{$ind}&IID=$var')\"/
       });
 		}
 		push @row,  "$btn " . $results->{$var}->{$ind};
