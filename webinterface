@@ -84,63 +84,22 @@ sub nms_obj {
   });
   
   if ( $FORM{SET} && $FORM{header} ) {
-    load_mibs({ ID => $FORM{ID} });
-    my %enums = oid_enums($FORM{SET});
-    print $html->form_main({
-      CONTENT =>
-        label_w_txt('LABEL',$FORM{SET}).
-        label_w_txt('VALUE', $FORM{VAL}|| 0, {
-          INP    => (oid_enums($FORM{SET}))? 'select' : 'input',
-          SELECT => (oid_enums($FORM{SET}))? \%enums : '',
-          RCOL => 8
-        }).
-        label_w_txt(undef, $html->form_input( 'SET', $lang{CHANGE}, {
-            TYPE => 'SUBMIT'
-          }) . "	" .
-						$html->button( $lang{CANCEL}, undef,{
-              SKIP_HREF => 1,
-              ex_params =>qq/data-dismiss='modal'/,
-              class => 'btn btn-default' }), {RCOL => 8}),
-	    METHOD  => 'GET',
-    	HIDDEN  => {
-        'index'  => $index,
-        'visual' => 'INFO',
-        'ID'     => $FORM{ID},
-        'LABEL'  => $FORM{SET}
-     },
-      class => 'form-horizontal'
-  	});
-    return 1
+    return nms_snmp_set({
+      ID    => $FORM{ID},
+      LABEL => $FORM{SET},
+      IID   => $FORM{IID},
+      VALUE => $FORM{VAL}
+    })
   }
-  if (($FORM{WRITE} || $FORM{RESET}) && $FORM{ID}){
-    my $obj = load_mibs({ ID => $FORM{ID} });
-    my $param = $Nms->oids_list({
-      ID        => $FORM{WRITE} || $FORM{RESET},
-      LABEL     => '_SHOW',
-      VALUE     => '_SHOW',
-      COLS_NAME => 1,
-    });
-    $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
-    my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
-    my $vb = SNMP::Varbind->new([$param->[0]->{label},$param->[0]->{iid}||0,$param->[0]->{value}]);
-    $sess->set($vb);
-    if ( $sess->{ErrorNum} ) {
-      return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
-    }
+  if ( $FORM{LABEL} && $FORM{VALUE} ) {
+    nms_snmp_set({
+          ID    => $FORM{ID},
+          LABEL => $FORM{LABEL},
+          IID   => $FORM{IID},
+          VALUE => $FORM{VALUE}
+        })
   }
   if ( $FORM{chg} ) {
-  	my $STATUS = $html->form_select(
-      'STATUS',
-      	{
-        		SELECTED  => $nms->[0]->{status}|| '',
-            SEL_HASH     => {
-              0  => $lang{ENABLED},
-              1  => $lang{DISABLED}
-            },
-            NO_ID        => 1,
-            SORT_KEY_NUM => 1
-      	}
-      );
     print $html->form_main({
           	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
                         label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
@@ -181,18 +140,19 @@ sub nms_obj {
       LABEL     => '_SHOW',
       SECTION   => '_SHOW',
       TYPE      => '_SHOW',
+      VALUE     => '_SHOW',
       COLS_NAME => 1,
       GROUP     => 'section'
     });
     my @main_btn;
     foreach my $val (@$oids){
       push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs" if $val->{type} eq 'table';
-      push @main_btn, $html->button( $lang{RESTART}, "index=$index$pages_qs&RESET=$val->{id}",{
+      push @main_btn, $html->button( $lang{RESTART}, "index=$index$pages_qs&VALUE=$val->{label}&LABEL=$val->{label}",{
         CONFIRM   => "$lang{RESTART} $nms->[0]->{ip} ?",
         ICON      => 'glyphicon glyphicon-repeat text-danger',
         class     => 'btn btn-default'
       }) if $val->{section} eq 'reboot';
-      push @main_btn, $html->button( $lang{SAVE}, "index=$index$pages_qs&WRITE=$val->{id}",{
+      push @main_btn, $html->button( $lang{SAVE}, "index=$index$pages_qs&VALUE=$val->{value}&LABEL=$val->{label}",{
         CONFIRM   => "$lang{SAVE} $lang{SETTINGS} $nms->[0]->{ip} ?",
         ICON      => 'glyphicon glyphicon-floppy-save text-info',
         class     => 'btn btn-default'
@@ -239,7 +199,7 @@ sub nms_obj {
          }
       );
 
-      print $html->element('div', $obj_select_form . $buttons, { class => 'navbar navbar-default' });
+      print $html->element('div', $obj_select_form . $buttons, { class => 'navbar navbar-default' }) if !$FORM{IN_MODAL};
     }
 
     my $visual = $FORM{visual} || 'INFO';
@@ -324,19 +284,18 @@ sub nms_obj_data {
       IID       => '_SHOW',
     }
   );
-  
-  if ( $FORM{LABEL} && $FORM{VALUE} ) {
-    $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
-    my $sess = SNMP::Session->new(DestHost => $prm->{ip}, %snmpparms);
-    my $vb = SNMP::Varbind->new([$FORM{LABEL},$FORM{IID}||0,$FORM{VALUE}]);
-    $sess->set($vb);
-    if ( $sess->{ErrorNum} ) {
-      return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
-    }
+  if ($attr->{OID_ID}){
+    $info = $Nms->oids_rows_list(
+        {
+          COLS_NAME => 1,
+          ID        => $attr->{OID_ID},
+          LABEL     => '_SHOW',
+        }
+      );
   }
   my @vars;
   foreach my $b (@$info) {
-    push @vars, [$b->{label},$b->{iid} || 0]
+    push @vars, [$b->{label},$b->{iid} || $attr->{IID} || 0]
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
@@ -359,7 +318,7 @@ sub nms_obj_data {
   );
 
   foreach my $val (@vars) {
-  my $edit = ($SNMP::MIB{$val->[0]}{'access'} && $SNMP::MIB{$val->[0]}{'access'} eq 'ReadWrite')?
+  my $edit = ($SNMP::MIB{$val->[0]}{'access'} && $SNMP::MIB{$val->[0]}{'access'} =~ /ReadWrite|WriteOnly/)?
     $html->button( $lang{CHANGE}, undef,{
       JAVASCRIPT     => '',
       SKIP_HREF      => 1,
@@ -370,16 +329,7 @@ sub nms_obj_data {
     }) :'';
   $table->addrow($html->b($val->[0]), $val->[2], $edit);
   }
-#  print qq(
-#    <script>
-#      function turnTextIntoInputField(inputOID,value) {
-#        var val = prompt(inputOID, value);
-#        if (val != value) {
-#          document.location = 'index.cgi?index=$index$pages_qs&visual=INFO&OID=' + inputOID + '&VAL=' + val;
-#        }
-#     }
-#    </script>
-#  );
+
   print $table->show();
 
   return 1;
@@ -453,25 +403,51 @@ sub oid_table {
 sub nms_snmp_set {
 
   my ($attr) = @_;
-  $snmpparms{UseSprintValue} = 1;
-  $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
-  my $sess = SNMP::Session->new(DestHost => $FORM{IP} || $attr->{IP}, %snmpparms);
-  my $result = $sess->set([ $FORM{OID} || $attr->{OID}, $FORM{IID} || $attr->{IID} || 0 ]);
+  my $prm = load_mibs({ ID => $attr->{ID} });
+  if ($FORM{IN_MODAL}){
+    my %enums = oid_enums($attr->{LABEL});
+    print $html->form_main({
+      CONTENT =>
+        (($FORM{IID})? label_w_txt('IID',$attr->{IID}) : '').
+        label_w_txt('LABEL',$attr->{LABEL}).
+        label_w_txt('VALUE', $attr->{VALUE}|| 0, {
+          INP    => (oid_enums($attr->{LABEL}))? 'select' : 'input',
+          SELECT => (oid_enums($attr->{LABEL}))? \%enums : '',
+          RCOL => 8
+        }).
+        label_w_txt(undef, $html->form_input( 'SET', $lang{CHANGE}, {
+            TYPE => 'SUBMIT'
+          }) . "	" .
+						$html->button( $lang{CANCEL}, undef,{
+              SKIP_HREF => 1,
+              ex_params =>qq/data-dismiss='modal'/,
+              class => 'btn btn-default' }), {RCOL => 8}),
+	    METHOD  => 'GET',
+    	HIDDEN  => {
+        'index'  => $index,
+        'visual' => $FORM{visual},
+        'ID'     => $attr->{ID},
+        'LABEL'  => $attr->{LABEL},
+        'IID'    => $attr->{IID}
+     },
+      class => 'form-horizontal'
+  	});
+    return 1
+  }
+  $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
+  my $sess = SNMP::Session->new(DestHost => $prm->{ip}, %snmpparms);
+  my $vb = SNMP::Varbind->new([$attr->{LABEL},$attr->{IID}||0,$attr->{VALUE}]);
+  $sess->set($vb);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
-  my $result_tbl = $html->table({});
-  $result_tbl->addrow($html->b($lang{RESULT}), $result);
-  #print $result_tbl->show();
-  print $attr->{OID};
- 
+
   return 1;
 }
 
 #**********************************************************
 
 =head2 nms_snmp_table()
-
 =cut
 
 #**********************************************************
@@ -479,63 +455,73 @@ sub nms_snmp_table {
 
   my ($attr) = @_;
   $snmpparms{UseSprintValue} = 1;
-#  $snmpparms{Timeout} = 10000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
-  my @columns;
+
   if (!$attr->{columns}){
-      foreach my $c (sort { $a <=> $b } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
-      push @columns, {data => $c->{label}};
-      push @{$attr->{columns}}, $c->{label}
-      }
-  }
-  else {
-    foreach my $c ( @{$attr->{columns}} ){
-      push @columns, { data => $c };
-    }
-  }
-  my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}], noindexes => 1 );
-  my @sorted_vals;
-  foreach my $key (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results){
-    foreach my $ind ( @{$attr->{columns}} ){
-      if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$key}->{$ind} ){
-        $results->{$key}->{$ind} =~ s/"|\n//g;
-        my @in_hex = split(/ /, $results->{$key}->{$ind});
-        my $ind_ex='';
-        foreach my $hex (@in_hex){
-          $ind_ex .= sprintf( "%08b", hex($hex));
-        }
-        $results->{$key}->{$ind} = '';
-        my $offset = 0;
-        my $result = index($ind_ex, 1, $offset);
-        while ($result != - 1) {
-          $result = index($ind_ex, 1, $offset);
-          $offset = $result + 1;
-          $results->{$key}->{$ind} .= "$offset " if ( $offset > 0 );
-        }
-      }
-      if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress' && $results->{$key}->{$ind}){
-        $results->{$key}->{$ind} = _mac_former($results->{$key}->{$ind});
-      }
-    }
-    push @sorted_vals, $results->{$key}
-  }
-  
-  if ( $sess->{ErrorNum} ) {
-    return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
+	    foreach my $c (sort { $b <=> $a } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
+			push @{$attr->{columns}}, $c->{'label'};
+	    }
   }
 
-  my $table =  $html->table({
-    ID          => $attr->{OID},
-    title_plain => \@{$attr->{columns}},
-    DATA_TABLE => {
-      data    => \@sorted_vals,
-      columns => \@columns,
-      lengthMenu => [[10, 28, 52, -1],[10, 28, 52, $lang{ALL}]],
+  my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}] );
+  if ( $sess->{ErrorNum} ) {
+	return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
+  }
+ 
+  my $table = $html->table(
+    {
+      ID          => $attr->{OID},
+      title_plain => [ @{$attr->{columns}} ],
+      DATA_TABLE  => {
+        ordering   => undef,
+        lengthMenu => [[10, 28, 52, -1],[10, 28, 52, $lang{ALL}]],
+      }
     }
-  });
-  return $table->show()
- }
+  );
+
+  foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
+	  my @row = ();
+	  foreach my $ind (@{$attr->{columns}}){
+    if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
+			$results->{$var}->{$ind} =~ s/"|\n//g;
+			my @in_hex = split(/ /, $results->{$var}->{$ind});
+			my $index='';
+			foreach my $hex (@in_hex){
+				$index .= sprintf( "%08b", hex($hex));
+			}
+	    $results->{$var}->{$ind} = '';
+			my $offset = 0;
+      my $result = index($index, 1, $offset);
+      while ($result != - 1) {
+        $result = index($index, 1, $offset);
+        $offset = $result + 1;
+        $results->{$var}->{$ind} .= "$offset " if ( $offset > 0 );
+      }
+		}
+		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
+			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
+		}
+    my $btn = '';
+    if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
+			$btn = $html->button( $lang{CHANGE}, undef, {
+        JAVASCRIPT     => '',
+        SKIP_HREF      => 1,
+        NO_LINK_FORMER => 1,
+        class          => 'change',
+        title          => $lang{CHANGE},
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&visual=$FORM{visual}&SET=$ind&VAL=$results->{$var}->{$ind}&IID=$var')\"/
+      });
+		}
+		push @row,  "$btn " . $results->{$var}->{$ind};
+	}
+#	if ( $row[1]) {
+		$table->addrow(@row);
+#	}
+  }
+
+  return $table->show();
+}
 
 #**********************************************************
 
@@ -825,7 +811,7 @@ sub label_w_txt {
   elsif ($attr->{SELECT} && ref($attr->{SELECT}) eq 'HASH') {
     while ( my ($key, $value) = each (%{$attr->{SELECT}}) ){
       my $op = $html->element('option', $value, { value => $key});
-      $op =~ s/<option /<option selected / if $text eq $key ;
+      $op =~ s/<option /<option selected / if $text eq $value ;
       push @sels, $op
     }
     $text = "@sels";
