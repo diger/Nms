@@ -812,7 +812,7 @@ sub label_w_txt {
   elsif ($attr->{SELECT} && ref($attr->{SELECT}) eq 'HASH') {
     while ( my ($key, $value) = each (%{$attr->{SELECT}}) ){
       my $op = $html->element('option', $value, { value => $key});
-      $op =~ s/<option /<option selected / if $text eq $value ;
+      $op =~ s/<option /<option selected / if $text eq $key ;
       push @sels, $op
     }
     $text = "@sels";
@@ -1319,7 +1319,7 @@ sub oids_set {
         if  ( $SNMP::MIB{$oid}{label} =~ /Reset|Write|Save|Reboot|write|reset/ && !$SNMP::MIB{$oid}{children}[0]{label}
         && ($SNMP::MIB{$oid}{access} && $SNMP::MIB{$oid}{access} =~ /ReadWrite|WriteOnly/) ) {
           my %enums = oid_enums($SNMP::MIB{$oid}{label});
-          $labels{$SNMP::MIB{$oid}{label}} = \%enums;
+          $labels{$SNMP::MIB{$oid}{label}} = (%enums) ? \%enums: undef;
         }
       }
       my $vals = JSON->new->indent->encode(\%labels);
@@ -1329,8 +1329,8 @@ sub oids_set {
           label_w_txt('TYPE',$list->[0]->{section}|| 'write', {INP=>'select', SELECT => ['write', 'reboot']}).
           label_w_txt('OID',$list->[0]->{label}|| 0, {INP=>'select', SELECT => \@keys}).
           label_w_txt('VALUE', $list->[0]->{value}|| 0, {
-            INP    =>'select',
-            SELECT => ($list->[0]->{label}) ? $labels{$list->[0]->{label}} : ''
+            INP    => ($list->[0]->{label} && $labels{$list->[0]->{label}})? 'select' : 'input',
+            SELECT => ($list->[0]->{label} && $labels{$list->[0]->{label}})? $labels{$list->[0]->{label}} : ''
           }).
           label_w_txt(undef, $html->form_input( 'SAVE', ($FORM{chg})? $lang{CHANGE} : $lang{CREATE}, {
               TYPE => 'SUBMIT'
@@ -1350,11 +1350,19 @@ sub oids_set {
         <script>
         var selectValues = $vals;
         jQuery('select#OID').on('change', function() {
-          jQuery('select#VALUE').empty();
-          jQuery.each(selectValues[this.value], function(key, value) {
-            jQuery('select#VALUE').append('<option value=' + key + '>' + value + '<option>');
-          });
-          jQuery('select#VALUE').trigger("chosen:updated");
+          if (selectValues[this.value] === null ) {
+            jQuery('select#VALUE').chosen("destroy");
+            jQuery('select#VALUE').replaceWith("<input class='form-control' name='VALUE' id='VALUE'></input>");
+          }
+          else {
+            jQuery('input#VALUE').replaceWith("<select class='form-control' name='VALUE' id='VALUE'></select>");
+            jQuery('select#VALUE').chosen();
+            jQuery('select#VALUE').empty();
+            jQuery.each(selectValues[this.value], function(key, value) {
+              jQuery('select#VALUE').append('<option value=' + key + '>' + value + '<option>');
+            });
+            jQuery('select#VALUE').trigger("chosen:updated");
+          }
         });
         </script>
       );
