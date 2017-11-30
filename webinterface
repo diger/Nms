@@ -406,11 +406,12 @@ sub nms_snmp_set {
   my $prm = load_mibs({ ID => $attr->{ID} });
   if ($FORM{IN_MODAL}){
     my %enums = oid_enums($attr->{LABEL});
+    my %vals = reverse %enums;
     print $html->form_main({
       CONTENT =>
         (($FORM{IID})? label_w_txt('IID',$attr->{IID}) : '').
         label_w_txt('LABEL',$attr->{LABEL}).
-        label_w_txt('VALUE', $attr->{VALUE}|| 0, {
+        label_w_txt('VALUE', $vals{$attr->{VALUE}}|| 0, {
           INP    => (oid_enums($attr->{LABEL}))? 'select' : 'input',
           SELECT => (oid_enums($attr->{LABEL}))? \%enums : '',
           RCOL => 8
@@ -516,9 +517,9 @@ sub nms_snmp_table {
 		}
 		push @row,  "$btn " . $results->{$var}->{$ind};
 	}
-#	if ( $row[1]) {
+	if ( $row[1]) {
 		$table->addrow(@row);
-#	}
+	}
   }
 
   return $table->show();
