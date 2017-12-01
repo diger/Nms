@@ -411,7 +411,7 @@ sub nms_snmp_set {
       CONTENT =>
         (($FORM{IID})? label_w_txt('IID',$attr->{IID}) : '').
         label_w_txt('LABEL',$attr->{LABEL}).
-        label_w_txt('VALUE', $vals{$attr->{VALUE}}|| 0, {
+        label_w_txt('VALUE', $vals{$attr->{VALUE}}|| $attr->{VALUE} || 0, {
           INP    => (oid_enums($attr->{LABEL}))? 'select' : 'input',
           SELECT => (oid_enums($attr->{LABEL}))? \%enums : '',
           RCOL => 8
