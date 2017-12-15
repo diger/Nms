@@ -91,6 +91,14 @@ sub nms_obj {
       VALUE => $FORM{VAL}
     })
   }
+  if ( $FORM{STAT} && $FORM{header} ) {
+    return nms_snmp_stats({
+      ID     => $FORM{ID},
+      LABEL  => $FORM{STAT},
+      IID    => $FORM{IID},
+      DEL_TR => $FORM{DEL_TR}
+    })
+  }
   if ( $FORM{LABEL} && $FORM{VALUE} ) {
     nms_snmp_set({
           ID    => $FORM{ID},
@@ -476,7 +484,7 @@ sub nms_snmp_table {
       title_plain => [ @{$attr->{columns}} ],
       DATA_TABLE  => {
         ordering   => undef,
-        lengthMenu => [[10, 28, 52, -1],[10, 28, 52, $lang{ALL}]],
+        lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
       }
     }
   );
@@ -485,42 +493,65 @@ sub nms_snmp_table {
   foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
 	  my @row = ();
 	  foreach my $ind (@{$attr->{columns}}){
-    if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
-			$results->{$var}->{$ind} =~ s/"|\n//g;
-			my @in_hex = split(/ /, $results->{$var}->{$ind});
-			my $index='';
-			foreach my $hex (@in_hex){
-				$index .= sprintf( "%08b", hex($hex));
-			}
-	    $results->{$var}->{$ind} = '';
-			my $offset = 0;
-      my $result = index($index, 1, $offset);
-      while ($result != - 1) {
-        $result = index($index, 1, $offset);
-        $offset = $result + 1;
-        $results->{$var}->{$ind} .= "$offset " if ( $offset > 0 );
+      if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
+  			$results->{$var}->{$ind} =~ s/"|\n//g;
+  			my @in_hex = split(/ /, $results->{$var}->{$ind});
+  			my $index='';
+  			foreach my $hex (@in_hex){
+  				$index .= sprintf( "%08b", hex($hex));
+  			}
+  	    $results->{$var}->{$ind} = '';
+  			my $offset = 0;
+        my $result = index($index, 1, $offset);
+        while ($result != - 1) {
+          $result = index($index, 1, $offset);
+          $offset = $result + 1;
+          $results->{$var}->{$ind} .= "$offset " if ( $offset > 0 );
+        }
+  		}
+  		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
+  			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
+  		}
+      if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
+        my $btn = $html->element( 'a', $html->element( 'span', undef, {
+          class =>'glyphicon glyphicon-pencil pull-right'
+        }), {
+          class   => 'col-xs-3',
+          title   => $lang{CHANGE},
+          onclick => "ChangeVal('$ind','$results->{$var}->{$ind}','$var')",
+        }) . $results->{$var}->{$ind} ;
+        push @row, $btn;
+  		}
+      elsif ( $SNMP::MIB{$ind}{type} && $SNMP::MIB{$ind}{type} =~ /COUNTER|GAUGE/ ){
+        my $btn = $html->element( 'a', $html->element( 'span', undef, {
+          class =>'glyphicon glyphicon-signal pull-right'
+        }), {
+          class   => 'col-xs-3',
+          title   => $lang{STATS},
+          onclick => "ChangeStat('$ind','$var')",
+        }) . $results->{$var}->{$ind} ;
+        push @row, $btn;
+  		}
+      else {
+        push @row,  $results->{$var}->{$ind};
       }
-		}
-		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
-			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
-		}
-    my $btn = '';
-    if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
-			$btn = $html->button( $lang{CHANGE}, undef, {
-        JAVASCRIPT     => '',
-        SKIP_HREF      => 1,
-        NO_LINK_FORMER => 1,
-        class          => 'change',
-        title          => $lang{CHANGE},
-        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2$visual&SET=$ind&VAL=$results->{$var}->{$ind}&IID=$var')\"/
-      });
-		}
-		push @row,  "$btn " . $results->{$var}->{$ind};
-	}
-	if ( $row[1]) {
-		$table->addrow(@row);
-	}
+  	}
+  	if ( $row[1]) {
+  		$table->addrow(@row);
+  	}
   }
+  print qq(
+     <script>
+     function ChangeVal(Ind,Val,Var){
+       var url = '?get_index=nms_obj$pages_qs&header=2$visual&SET=' + Ind + '&VAL=' + Val + '&IID=' + Var;
+       loadRawToModal(url);
+     };
+     function ChangeStat(Ind,Var){
+       var url = '?get_index=nms_obj$pages_qs&header=2$visual&STAT=' + Ind + '&IID=' + Var;
+       loadRawToModal(url);
+     };
+    </script>
+  ); 
 
   return $table->show();
 }
@@ -689,15 +720,56 @@ sub nms_snmp_stats {
           encoding => undef,
   );
 
+  if ($attr->{DEL_TR}){
+    $Nms->trigger_del($attr->{DEL_TR});
+    return 1
+  }
   my $stats = $Nms->triggers_list({
       COLS_NAME => 1,
       OBJ_ID    => $attr->{ID},
-      LABEL     => '_SHOW',
-      IID       => '_SHOW',
+      LABEL     => $attr->{LABEL} || '_SHOW',
+      IID       => $attr->{IID} || '_SHOW',
       MONIT     => '_SHOW',
       SYS_NAME  => '_SHOW',
-    });
-  return 1 if !$stats;
+  });
+
+  if (!$stats && $FORM{IN_MODAL}) {
+    my $frm = label_w_txt('IID',$attr->{IID});
+    $frm .= label_w_txt('LABEL',$attr->{LABEL});
+    $frm .= label_w_txt('MONIT',$html->form_input('MONIT', 1, {
+      TYPE => 'checkbox',
+      STATE => $stats->[0]->{monit}||undef
+    }));
+    $frm .= label_w_txt(undef, 
+    $html->element('button', $lang{ADD}, {
+        class => 'btn btn-info',
+        'data-dismiss' => 'modal',
+        type    =>'button',
+        onclick => "addTrigger()"
+    }) .
+    $html->element('button', $lang{CANCEL}, {
+        class => 'btn btn-default',
+        'data-dismiss' => 'modal',
+        type    =>'button',
+     }), {RCOL => 8});
+
+    print $html->element('form', $frm , { class => 'form-horizontal' });
+    print qq(
+    <script>
+    function addTrigger(){
+      var monit = 0;
+      if(jQuery("input#MONIT").is(':checked')) {
+        monit = 1;
+      }
+      jQuery.get('?get_index=nms_obj&header=2&OBJ_ID=$attr->{ID}&STAT=$attr->{LABEL}&IID=$attr->{IID}&MONIT=' + monit);
+    };
+    </script>
+    );
+    return 1
+  }
+  elsif (!$stats) {
+    return 1
+  }
 
   my $to_date = time;
   my $from_date = time-21600;
@@ -732,7 +804,7 @@ sub nms_snmp_stats {
     }
   );
 
-  if (!$attr->{MONIT}){
+  if (!$attr->{MONIT} && !$FORM{IN_MODAL}){
     print $html->form_main(
       {
         CONTENT => "$lang{PERIOD}: $lang{FROM} &nbsp" . $html->form_datetimepicker2('FROM_DATE') .
@@ -762,8 +834,16 @@ sub nms_snmp_stats {
       resize    => 'true'
     });
   }
+  my $del_btn = ($FORM{IN_MODAL})? $html->element('button', $lang{DEL} .' trigger', {
+    class => 'btn btn-default',
+    'data-dismiss' => 'modal',
+    type    =>'button',
+    onclick => "jQuery.get('?get_index=nms_obj&header=2&STAT=1&DEL_TR=$stats->[0]->{id}')"
+  }) : '';
+
   return $chart if $attr->{MONIT};
-  print $chart;
+  
+  print $chart.$del_btn;
   return 1
 }
 
@@ -1424,7 +1504,7 @@ sub oid_table_row_edit {
   my @colls;
   foreach my $coll (@{$SNMP::MIB{$oid->{label}}{children}[0]{children}}) {
     my $state = ( exists $rows->{$coll->{label}} ) ? 1 : undef ;
-    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }),{LCOL => 2} );
+    push @colls, label_w_txt( $coll->{label}, $html->form_input($coll->{label}, $state, { TYPE => 'checkbox', STATE => $state }),{LCOL => 4,RCOL => 2} );
   }
 	print $html->element('div', $html->element('h4', $oid->{label}, { class => 'modal-title' }),
     { class => 'modal-header' });
