@@ -47,24 +47,6 @@ else {
   $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
 }
 
-if ($argv->{INIT}) {
-  my %mod;
-  foreach my $oid (keys(%SNMP::MIB)) {
-    my $parent = '';
-    if ( split(/\./,$SNMP::MIB{$oid}{objectID}) > 8 ){
-      my @prt = split(/\./,$SNMP::MIB{$oid}{objectID});
-      $parent = "@prt[0,1,2,3,4,5,6,7]";
-      $parent =~ s/ /./g;
-      $parent = $SNMP::MIB{$parent}{label};
-    }
-    $mod{$SNMP::MIB{$oid}{moduleID}} = $parent if $SNMP::MIB{$oid}{moduleID}
-  }
-  foreach my $key ( sort keys %mod ) {
-    $Nms->module_add({ NODE => $mod{$key}, MODULE => $key })
-  }
-
-  return 255
-}
 if ($argv->{PING}) {
   nms_ping();
 }
@@ -106,6 +88,7 @@ sub nms_poll {
                              ['sysUpTime', 0]);
 
   if ($argv->{DISC}) {
+    $Nms->{debug}=1;
     $snmpparms{Timeout} = 400000;
 	  my $ip = new Net::IP( $argv->{IPS} || $conf{NMS_NET});
 	  do {
@@ -136,7 +119,7 @@ sub nms_poll {
       stats($obj->{ip}, $stats);
     }
     
-    if ($argv->{MOD}) {
+    if ($argv->{INIT}) {
       $snmpparms{DestHost} = $obj->{ip};
 		  $sess = new SNMP::Session(%snmpparms);
 		  print $obj->{ip} . "\n" if $debug > 0;
@@ -148,6 +131,7 @@ sub nms_poll {
             LABEL    => $SNMP::MIB{$result[0]}{label},
           }) if $debug < 1;
       }
+=com
       my $modules = $sess->gettable( 'sysORTable', columns => ['sysORID','sysORDescr'], noindexes => 1 );
       if ($modules) {
         print Dumper %$modules if $debug > 0;
@@ -165,6 +149,7 @@ sub nms_poll {
           }) if $debug < 1;
         }
       }
+=cut
     }
   }
 
