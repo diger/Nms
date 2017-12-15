@@ -373,26 +373,17 @@ sub sysobjectid_list {
 #**********************************************************
 # sysobjectid_add()
 #**********************************************************
-#sub sysobjectid_add {
-#  my $self = shift;
-#  my ($attr) = @_;
-
-#  $self->query2("INSERT INTO nms_sysobjectid (sysobjectid, sysorid, sysordescr, module) VALUES
-#				('$attr->{SYSOBJECTID}', '$attr->{SYSORID}', '$attr->{SYSORDESCR}', '$attr->{MODULE}')
-#				ON DUPLICATE KEY UPDATE module='$attr->{MODULE}', sysordescr='$attr->{SYSORDESCR}'", 'do'
-#				);
-
-#  return $self;
-#}
-
 sub sysobjectid_add {
   my $self = shift;
   my ($attr) = @_;
-  
-  $self->query_add('nms_sysobjectid', $attr, { REPLACE => 1 });
+
+  $self->query2("INSERT INTO nms_sysobjectid (objectid, label) VALUES
+				('$attr->{OBJECTID}', '$attr->{LABEL}')
+				ON DUPLICATE KEY UPDATE label='$attr->{LABEL}'", 'do'
+				);
+
   return $self;
 }
-
 #**********************************************************
 =head2 sysobjectid_list($attr)
 
