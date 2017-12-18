@@ -93,10 +93,12 @@ sub nms_obj {
   }
   if ( $FORM{STAT} && $FORM{header} ) {
     return nms_snmp_stats({
-      ID     => $FORM{ID},
+      OBJ_ID => $FORM{ID},
       LABEL  => $FORM{STAT},
       IID    => $FORM{IID},
-      DEL_TR => $FORM{DEL_TR}
+      MONIT  => $FORM{MONIT},
+      DEL_TR => $FORM{DEL_TR},
+      ADD_TR => $FORM{ADD_TR}
     })
   }
   if ( $FORM{LABEL} && $FORM{VALUE} ) {
@@ -698,7 +700,7 @@ sub mibs_browser {
   	});
   </script>); 
 
-  print $tree.$res.$scr;
+  print $html->element('div', $tree.$res,{class=>'row col-md-12'}) . $scr;
   return 1;
 }
 
@@ -724,9 +726,19 @@ sub nms_snmp_stats {
     $Nms->trigger_del($attr->{DEL_TR});
     return 1
   }
+  if ($attr->{ADD_TR}){
+    $Nms->trigger_add({
+      OBJ_ID => $attr->{OBJ_ID},
+      LABEL  => $attr->{LABEL},
+      IID    => $attr->{ADD_TR},
+      MONIT  => $attr->{MONIT}
+    });
+    print Dumper $attr;
+    return 1
+  }
   my $stats = $Nms->triggers_list({
       COLS_NAME => 1,
-      OBJ_ID    => $attr->{ID},
+      OBJ_ID    => $attr->{OBJ_ID},
       LABEL     => $attr->{LABEL} || '_SHOW',
       IID       => $attr->{IID} || '_SHOW',
       MONIT     => '_SHOW',
@@ -757,11 +769,11 @@ sub nms_snmp_stats {
     print qq(
     <script>
     function addTrigger(){
-      var monit = 0;
+      var monit;
       if(jQuery("input#MONIT").is(':checked')) {
-        monit = 1;
+        monit = '&MONIT=1';
       }
-      jQuery.get('?get_index=nms_obj&header=2&OBJ_ID=$attr->{ID}&STAT=$attr->{LABEL}&IID=$attr->{IID}&MONIT=' + monit);
+      jQuery.get('?get_index=nms_obj&header=2&ID=$attr->{OBJ_ID}&STAT=$attr->{LABEL}&ADD_TR=$attr->{IID}' + monit);
     };
     </script>
     );

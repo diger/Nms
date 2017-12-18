@@ -6,8 +6,15 @@ package Nms;
 
 =cut
 
+=head2 VERSION
+
+   VERSION = 1.0
+
+=cut
+
 use strict;
 use parent 'main';
+our $VERSION = 1.0;
 use warnings FATAL => 'all';
 use Socket;
 
