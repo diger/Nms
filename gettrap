@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/env perl
 
 =head1 NAME
 
@@ -17,7 +17,7 @@ BEGIN {
   unshift(@INC, $libpath . "Abills/$sql_type/", $libpath . '/lib/', $libpath . "Abills/modules/Nms/db");
 }
 
-use Abills::Base qw(parse_arguments load_pmodule2);
+use Abills::Base qw(parse_arguments);
 
 #use threads;
 use Data::Dumper;
@@ -29,11 +29,10 @@ use Log qw(log_add);
 use Admins;
 use Nms;
 use Traps;
+use SNMP;
+use Net::SNMPTrapd;
 
 our (%conf, $DATE, $TIME, $var_dir);
-
-load_pmodule2('Net::SNMPTrapd');
-load_pmodule2('SNMP');
 
 if ($#ARGV < 0) {
   help();

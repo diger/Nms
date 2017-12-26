@@ -29,25 +29,16 @@ SNMP::addMibDirs( "$var_dir/snmp/mibs/private" );
 SNMP::addMibFiles(glob("$var_dir/snmp/mibs/private" . '/*'));
 SNMP::initMib();
 
-my $SNMP_COMMUNITY = $argv->{SNMP_COMMUNITY} || $conf{NMS_COMMUNITY_RO};
 my %snmpparms;
-$snmpparms{Community} = $SNMP_COMMUNITY;
 $snmpparms{Version} = 2;
 $snmpparms{Retries} = 1;
 $snmpparms{UseSprintValue} = 0;
 $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 
-my $Redis = Redis->new( server   => $conf{REDIS_SERV}, encoding => undef );
+my $Redis = Redis->new( server => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $sess;
 my $ctime = time;
-my $Log = Log->new($db, $Admin);
-if($debug > 2) {
-  $Log->{PRINT}=1;
-}
-else {
-  $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
-}
 
 if ($argv->{INIT}) {
   nms_init();
@@ -90,6 +81,7 @@ sub nms_init {
 
   if ($argv->{DISC}) {
     $Nms->{debug}=1;
+    $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
     $snmpparms{Timeout} = 400000;
 	  my $ip = Net::IP->new( $argv->{IPS} || $conf{NMS_NET});
 	  do {
@@ -121,6 +113,7 @@ sub nms_init {
     }
     
     if ($argv->{INIT}) {
+      $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
       $snmpparms{DestHost} = $obj->{ip};
 		  $sess = SNMP::Session->new(%snmpparms);
 		  print $obj->{ip} . "\n" if $debug > 0;
@@ -152,9 +145,11 @@ sub nms_poll {
     STATUS       => '_SHOW',
   } );
 
-  my $var;
-
   foreach my $obj (@$obj_list) {
+    my @mibs;
+    push @mibs, ['sysObjectID', 0];
+ #   push @mibs, ['sysName', 0];
+#    push @mibs, ['sysLocation', 0];
     my $triggers;
     if ($argv->{STATS}){
       $triggers = $Nms->triggers_list({
@@ -162,29 +157,22 @@ sub nms_poll {
         OBJ_ID    => $obj->{id},
         LABEL     => '_SHOW',
         IID       => '_SHOW',
-      })
-    }
-    my @mibs;
-    push @mibs, ['sysObjectID', 0];
- #   push @mibs, ['sysName', 0];
-#    push @mibs, ['sysLocation', 0];
-    if ($triggers){
-      foreach my $vr (@$triggers){
-        push @mibs, [$vr->{label},$vr->{iid}];
+      });
+      if ($triggers){
+        foreach my $vr (@$triggers){
+          push @mibs, [$vr->{label},$vr->{iid}];
+        }
       }
     }
     
     my $vb = SNMP::VarList->new(@mibs);
-
     $sess = SNMP::Session->new(
-      DestHost => $obj->{ip},
-      Version  => 2,
-      Retries  => 1,
+      %snmpparms,
+      Community => $conf{NMS_COMMUNITY_RO},
+      DestHost  => $obj->{ip},
   #    Timeout  => -1,
-      Community=> $conf{NMS_COMMUNITY_RO}
     );
-
-    $var = $sess->get($vb, [ \&nms_clb, $obj, $triggers ]);
+    $sess->get($vb, [ \&nms_clb, $obj, $triggers ]);
 
     &SNMP::MainLoop(2);
   }
@@ -196,7 +184,7 @@ sub nms_poll {
 
 =cut
 #**********************************************************
-sub nms_clb{
+sub nms_clb {
   my ($obj,$tr,$vl) = @_;
   if ( defined $vl->[0] ) {
     &SNMP::finish();
