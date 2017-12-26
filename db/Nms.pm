@@ -537,20 +537,4 @@ sub trigger_del {
   return $self;
 }
 
-#**********************************************************
-=head2 change_obj_status()
-
-=cut
-#**********************************************************
-sub change_obj_status {
-  my $self = shift;
-  my ($attr) = @_;
-  
-  $self->query2("UPDATE nms_obj SET status='$attr->{STATUS}' WHERE id='$attr->{ID}'", 'do');
-
-  return $self;
-}
-
-
-
 1;
