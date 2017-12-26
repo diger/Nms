@@ -7,12 +7,13 @@ use strict;
 use warnings;
 
 use Abills::Filters;
-use Abills::Base qw(in_array load_pmodule2 ip2int);
+use Abills::Base qw(in_array ip2int);
 use POSIX qw(strftime);
 use Nms::db::Nms;
 use Data::Dumper;
 use Net::IP;
 use SNMP;
+use Redis;
 
 our (
   $Admin,
@@ -36,19 +37,20 @@ $snmpparms{Retries} = 1;
 $snmpparms{UseSprintValue} = 0;
 $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 
+my $Redis = Redis->new( server   => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $sess;
 my $ctime = time;
-my $Log = Log->new($db, $Admin);
-if($debug > 2) {
-  $Log->{PRINT}=1;
-}
-else {
-  $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
-}
+#my $Log = Log->new($db, $Admin);
+#if($debug > 2) {
+#  $Log->{PRINT}=1;
+#}
+#else {
+#  $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
+#}
 
-if ($argv->{PING}) {
-  nms_ping();
+if ($argv->{INIT}) {
+  nms_init();
 }
 
 nms_poll();
@@ -63,7 +65,7 @@ nms_poll();
   
 =cut
 #**********************************************************
-sub nms_poll {
+sub nms_init {
 	
 	if($debug > 7) {
 		$Nms->{debug}=1;
@@ -131,49 +133,7 @@ sub nms_poll {
             LABEL    => $SNMP::MIB{$result[0]}{label},
           }) if $debug < 1;
       }
-=com
-      my $modules = $sess->gettable( 'sysORTable', columns => ['sysORID','sysORDescr'], noindexes => 1 );
-      if ($modules) {
-        print Dumper %$modules if $debug > 0;
-        foreach my $key ( keys %$modules ){
-          my $module;
-          if ($SNMP::MIB{$modules->{$key}->{sysORID}}){
-            $module = $SNMP::MIB{$modules->{$key}->{sysORID}}{moduleID};
-          }
-          my @sysordescr =  split(': ',$modules->{$key}->{sysORDescr});
-           $Nms->module_add({ 
-            OBJECTID => $result[0],
-            MODULE   => $module,
-            DESCR    => $sysordescr[1] || "@sysordescr",
-            STATUS   => ($module)? 1 : 0,
-          }) if $debug < 1;
-        }
-      }
-=cut
     }
-  }
-
-  return 1;
-}
-
-#**********************************************************
-=head2 stats($attr)
-
-=cut
-#********************************************************** 
-sub stats {
-  
-	load_pmodule2('Redis');
-  my ($ip,$attr) = @_;
-  my $redis = Redis->new(
-          server   => $conf{REDIS_SERV},
-          encoding => undef,
-  );
-  $sess = SNMP::Session->new( DestHost => $ip, %snmpparms );
-
-  foreach my $var (@$attr) {
-    my $val = $sess->get("$var->{label}.$var->{iid}");
-    $redis->zadd( "$var->{id}", $ctime, $val );
   }
 
   return 1;
@@ -184,48 +144,88 @@ sub stats {
 
 =cut
 #********************************************************** 
-sub nms_ping {
+sub nms_poll {
   my $obj_list = $Nms->obj_list( {
     COLS_NAME    => 1,
     PAGE_ROWS    => 100000,
     IP           => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    STATUS       => '_SHOW',
   } );
 
   my %list;
   my $var;
 
   foreach my $obj (@$obj_list) {
+    my $triggers = $Nms->triggers_list({
+      COLS_NAME => 1,
+      OBJ_ID    => $obj->{id},
+      LABEL     => '_SHOW',
+      IID       => '_SHOW',
+    }) if $argv->{STATS};
+    my @mibs;
+    push @mibs, ['sysObjectID', 0];
+ #   push @mibs, ['sysName', 0];
+#    push @mibs, ['sysLocation', 0];
+    if ($triggers){
+      foreach my $vr (@$triggers){
+        push @mibs, [$vr->{label},$vr->{iid}];
+      }
+    }
+    
+    my $vb = new SNMP::VarList(@mibs);
+
     $sess = SNMP::Session->new(
       DestHost => $obj->{ip},
       Version  => 2,
       Retries  => 1,
-      Timeout  => -1,
+  #    Timeout  => -1,
       Community=> $conf{NMS_COMMUNITY_RO}
     );
 
-    my $vb = new SNMP::Varbind(['sysUpTime']);
-    $var = $sess->getnext($vb, [ \&gotit, $obj->{id}, \%list ]);
+    $var = $sess->get($vb, [ \&nms_clb, $obj, $triggers ]);
 
-    # After every 100 IP's, wait for the timeout period (default is two seconds) to keep from overwhelming routers with ARP queries.
-#    if ( $id > 100 ) {
-      &SNMP::MainLoop(2);
-#      $id = 0;
-#    }
+    &SNMP::MainLoop(2);
   }
 }
 
-sub gotit{
-  my $id = shift;
-  my $listref = shift;
-  my $vl = shift;
-  if ( defined $$vl[0] ) {
+#**********************************************************
+=head2 nms_clb$obj,$tr,$vl)
+
+=cut
+#**********************************************************
+sub nms_clb{
+  my ($obj,$tr,$vl) = @_;
+  if ( defined $vl->[0] ) {
     &SNMP::finish();
-    $Nms->change_obj_status({ ID => $id, STATUS => 0 });
-    print "$id Ok \n" if $debug > 1;
-#    $$listref{$id}{desc} = $$vl[0]->val;
-  } else {
-    $Nms->change_obj_status({ ID => $id, STATUS => 1 });
-    print "$id fall \n" if $debug > 1;
+    if ($vl->[0]->[2] ne $obj->{sysobjectid}){
+      $Nms->obj_add({ 
+        ID           => $obj->{id},
+        SYS_OBJECTID => $vl->[0]->[2],
+      })
+    }
+    if ( $obj->{status} != 0 ){
+      $Nms->obj_add({ 
+        ID     => $obj->{id},
+        STATUS => 0
+      })
+    }
+    if ( $tr ){
+      print Dumper $vl if $debug > 2;
+      foreach my $ind (0..@$tr-1){
+        $Redis->zadd( "$tr->[$ind]->{id}", $ctime, $vl->[$ind+1]->[2] );
+      }
+    }
+    print "$obj->{id} Ok \n" if $debug > 1;
+  }
+  else {
+    if ( $obj->{status} != 1 ){
+      $Nms->obj_add({ 
+        ID     => $obj->{id},
+        STATUS => 1
+      })
+    }
+    print "$obj->{id} fall \n" if $debug > 1;
   }
   return();
 }

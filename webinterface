@@ -9,11 +9,12 @@
 use strict;
 use warnings FATAL => 'all';
 use POSIX qw(strftime);
-use Abills::Base qw(in_array mk_unique_value load_pmodule2 date_format _bp);
+use Abills::Base qw(in_array mk_unique_value date_format _bp);
 use Abills::Filters qw(_mac_former dec2hex);
 require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
+use SNMP;
 
 our ($html,
   %lang,
@@ -23,8 +24,6 @@ our ($html,
 );
 
 our $Nms = Nms->new( $db, $admin, \%conf );
-
-load_pmodule2('SNMP');
 
 SNMP::addMibDirs( '../../var/snmp/mibs' );
 SNMP::addMibDirs( '../../var/snmp/mibs/private' );
