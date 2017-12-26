@@ -41,22 +41,21 @@ my $Redis = Redis->new( server   => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $sess;
 my $ctime = time;
-#my $Log = Log->new($db, $Admin);
-#if($debug > 2) {
-#  $Log->{PRINT}=1;
-#}
-#else {
-#  $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
-#}
+my $Log = Log->new($db, $Admin);
+if($debug > 2) {
+  $Log->{PRINT}=1;
+}
+else {
+  $Log->{LOG_FILE} = $var_dir.'/log/nms_poll.log';
+}
 
 if ($argv->{INIT}) {
   nms_init();
 }
 
 nms_poll();
-
 #**********************************************************
-=head2 nms_poll($attr)
+=head2 nms_init($attr)
 
   Arguments:
     
@@ -83,7 +82,7 @@ sub nms_init {
     IP           => $argv->{NAS_IPS} || '_SHOW',
   } );
 
-  my $vl = new SNMP::VarList(['sysObjectID', 0],
+  my $vl = SNMP::VarList->new(['sysObjectID', 0],
                              ['sysDescr', 0],
                              ['sysName', 0],
                              ['sysLocation', 0],
@@ -92,10 +91,10 @@ sub nms_init {
   if ($argv->{DISC}) {
     $Nms->{debug}=1;
     $snmpparms{Timeout} = 400000;
-	  my $ip = new Net::IP( $argv->{IPS} || $conf{NMS_NET});
+	  my $ip = Net::IP->new( $argv->{IPS} || $conf{NMS_NET});
 	  do {
       $snmpparms{DestHost} = $ip->ip();
-		  $sess = new SNMP::Session(%snmpparms);
+		  $sess = SNMP::Session->new(%snmpparms);
 		  print $ip->ip() . "\n" if $debug > 0;
 		  my @result = $sess->get($vl);
       print Dumper \@result if $debug > 0;
@@ -123,7 +122,7 @@ sub nms_init {
     
     if ($argv->{INIT}) {
       $snmpparms{DestHost} = $obj->{ip};
-		  $sess = new SNMP::Session(%snmpparms);
+		  $sess = SNMP::Session->new(%snmpparms);
 		  print $obj->{ip} . "\n" if $debug > 0;
       my @result = $sess->get($vl);
       if (@result) {
@@ -140,7 +139,7 @@ sub nms_init {
 }
 
 #**********************************************************
-=head2 nms_ping($attr)
+=head2 nms_poll($attr)
 
 =cut
 #********************************************************** 
@@ -153,16 +152,18 @@ sub nms_poll {
     STATUS       => '_SHOW',
   } );
 
-  my %list;
   my $var;
 
   foreach my $obj (@$obj_list) {
-    my $triggers = $Nms->triggers_list({
-      COLS_NAME => 1,
-      OBJ_ID    => $obj->{id},
-      LABEL     => '_SHOW',
-      IID       => '_SHOW',
-    }) if $argv->{STATS};
+    my $triggers;
+    if ($argv->{STATS}){
+      $triggers = $Nms->triggers_list({
+        COLS_NAME => 1,
+        OBJ_ID    => $obj->{id},
+        LABEL     => '_SHOW',
+        IID       => '_SHOW',
+      })
+    }
     my @mibs;
     push @mibs, ['sysObjectID', 0];
  #   push @mibs, ['sysName', 0];
@@ -173,7 +174,7 @@ sub nms_poll {
       }
     }
     
-    my $vb = new SNMP::VarList(@mibs);
+    my $vb = SNMP::VarList->new(@mibs);
 
     $sess = SNMP::Session->new(
       DestHost => $obj->{ip},
@@ -187,10 +188,11 @@ sub nms_poll {
 
     &SNMP::MainLoop(2);
   }
+  return 1;
 }
 
 #**********************************************************
-=head2 nms_clb$obj,$tr,$vl)
+=head2 nms_clb($obj,$tr,$vl)
 
 =cut
 #**********************************************************
