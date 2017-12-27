@@ -3,12 +3,15 @@
   "2:1:OIDS:oids_set:OBJECTID"              => 5,
   "3:1:SNMP Modules:modules_table:OBJECTID" => 5,
   "4:1:Cable Test:cable_test_setup:"        => 5,
-  "5:1:Traps:nms_trap_types:"               => 5,
-  "6:0:NMS:nms_monitor:"                    => 6,
-  "7:0:NMS:nms_obj:"                        => 8,
-  "8:0:MIBS browser:mibs_browser:"          => 8,
-  "9:0:Traps:nms_traps:"                    => 8,
-  "10:0:Cable test:cable_test:UID"          => 20,
+  "5:1:Triggers:nms_triggers_list:"         => 5,
+  "6:1:$lang{REPORTS}:nms_reports_setup:"   => 5,
+  "7:1:Traps:nms_trap_types:"               => 5,
+  "8:0:NMS:nms_monitor:"                    => 6,
+  "9:0:NMS:nms_obj:"                       => 8,
+  "10:0:MIBS browser:mibs_browser:"         => 8,
+  "11:0:Traps:nms_traps:"                   => 8,
+  "12:0:Cable test:cable_test:UID"          => 20,
+    "13:0:NMS:nms_reports:"                    => 4,
 );
 
 %PERIODIC = (daily   => [ 'nms_traps_clean' ]);

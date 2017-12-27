@@ -194,12 +194,12 @@ sub nms_clb {
         SYS_OBJECTID => $vl->[0]->[2],
       })
     }
-   # if ( $obj->{status} != 0 ){
+    if ( $obj->{status} != 0 ){
       $Nms->obj_add({ 
         ID     => $obj->{id},
         STATUS => 0
       });
-  #  }
+    }
     if ( $tr ){
       print Dumper $vl if $debug > 2;
       foreach my $ind (0..@$tr-1){

@@ -91,7 +91,7 @@ sub nms_obj {
     })
   }
   if ( $FORM{STAT} && $FORM{header} ) {
-    return nms_snmp_stats({
+    return nms_trigger({
       OBJ_ID => $FORM{ID},
       LABEL  => $FORM{STAT},
       IID    => $FORM{IID},
@@ -140,8 +140,8 @@ sub nms_obj {
     return 1;
   }
 
-  if ($FORM{ID} || $FORM{IP}) {
-    my $obj_id = $FORM{ID} || $nms->[0]->{id};
+  if ($FORM{ID} || $FORM{OBJ_ID} || $FORM{IP}) {
+    my $obj_id = $FORM{ID} || $FORM{OBJ_ID} || $nms->[0]->{id};
     $pages_qs .= "&ID=$obj_id";
     my @header_arr = ("$lang{MAIN}:index=$index&visual=INFO$pages_qs");
     my $oids = $Nms->oids_list({
@@ -216,7 +216,7 @@ sub nms_obj {
       nms_obj_data({ ID => $obj_id });
     } 
     elsif ($visual eq 'STATS') {
-      nms_snmp_stats({ ID => $obj_id });
+      nms_trigger({ ID => $obj_id });
     } 
     elsif ($visual eq 'MIB_BR') {
       mibs_browser({ ID => $obj_id });
@@ -705,12 +705,56 @@ sub mibs_browser {
 
 #**********************************************************
 
-=head2 nms_snmp_stats()
+=head2 nms_triggers_list()
 
 =cut
 
 #**********************************************************
-sub nms_snmp_stats {
+sub nms_triggers_list {
+  
+  my ($attr) = @_;
+
+  if ($FORM{del}){
+    $Nms->trigger_del($FORM{del});
+    return 1
+  }
+  if ($attr->{ADD_TR}){
+    $Nms->trigger_add({
+      OBJ_ID => $attr->{OBJ_ID},
+      LABEL  => $attr->{LABEL},
+      IID    => $attr->{ADD_TR},
+      MONIT  => $attr->{MONIT}
+    });
+    return 1
+  }
+
+  result_former({
+    INPUT_DATA      => $Nms,
+    FUNCTION        => 'triggers_list',
+    DEFAULT_FIELDS  => 'LABEL,SYS_NAME,IID,MONIT',
+    HIDDEN_FIELDS   => 'OBJ_ID',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    TABLE => {
+      caption => " ",
+      qs      => $pages_qs,
+      ID      => 'TRIGGERS_LIST',
+    },
+    SELECT_VALUE => { monit => { 0 => " ", 1 => " :glyphicon glyphicon-ok" } },
+    FILTER_COLS  => { sysname => "search_link:nms_obj:,OBJ_ID" },
+    MAKE_ROWS => 1,
+    TOTAL     => 1
+  });
+  return 1
+}
+#**********************************************************
+
+=head2 nms_trigger()
+
+=cut
+
+#**********************************************************
+sub nms_trigger {
   
   my ($attr) = @_;
   use Time::Local;
@@ -732,7 +776,6 @@ sub nms_snmp_stats {
       IID    => $attr->{ADD_TR},
       MONIT  => $attr->{MONIT}
     });
-    print Dumper $attr;
     return 1
   }
   my $stats = $Nms->triggers_list({
@@ -1278,7 +1321,7 @@ sub nms_monitor {
   my $traps_pg_rows = $FORM{FILTER} || 10;
   my $page = nms_obj({ STATUS => 1, MONIT => 1 });
   if ($page eq '1') {
-    $page = nms_snmp_stats({ MONIT => 1 });
+    $page = nms_trigger({ MONIT => 1 });
   }
   $page .= nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
 
@@ -1551,5 +1594,26 @@ sub oid_table_row_edit {
   return 1;
 }
 
+#**********************************************************
+
+=head2 nms_reports_setup()
+
+=cut
+
+#**********************************************************
+sub nms_reports_setup {
+  return 1
+}
+
+#**********************************************************
+
+=head2 nms_reports()
+
+=cut
+
+#**********************************************************
+sub nms_reports {
+  return 1
+}
 
 1;
