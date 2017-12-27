@@ -758,7 +758,7 @@ sub nms_trigger {
   
   my ($attr) = @_;
   use Time::Local;
-  load_pmodule2('Redis');
+  use Redis;
 
   my $redis = Redis->new(
           server => $conf{REDIS_SERV},
