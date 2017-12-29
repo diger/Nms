@@ -1017,7 +1017,7 @@ sub modules_table {
   if ($FORM{SAVE}){
     $Nms->module_add({
       ID        => $FORM{ID}||'',
-      MODULE    => $FORM{NAME},
+      MODULE    => $FORM{MODULE},
       OBJECTID  => $FORM{OBJECTID},
       DESCR     => $FORM{DESCR},
       STATUS    => $FORM{STATUS} || 0
@@ -1038,32 +1038,26 @@ sub modules_table {
        $mod{$SNMP::MIB{$oid}{moduleID}} = '' if $SNMP::MIB{$oid}{moduleID}
     }
     my @mods = sort keys %mod;
-  	my $NAME_SEL = $html->form_select(
-      'NAME',
-      	{
-        		SELECTED  => $modules->[0]->{module}|| '',
-        		SEL_ARRAY  => \@mods,
-      	}
-      );
+
     print $html->form_main({
-          	CONTENT =>  label_w_txt($lang{DESCRIBE}, $modules->[0]->{descr}).
-                        label_w_txt($lang{NAME}, $NAME_SEL).
-                        label_w_txt($lang{STATUS}, $html->form_input('STATUS', 1, {
-                            TYPE => 'checkbox',
-                            STATE => $modules->[0]->{status}||undef
-                          })
-                          ).
-                        label_w_txt(undef, $html->form_input( 'SAVE', ( $FORM{chg} )? $lang{CHANGE} : $lang{CREATE}, {
-                            TYPE => 'SUBMIT'
-                          }) . "	" .
-      											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
-      								  {RCOL => 3}),
+          	CONTENT => 
+              label_w_txt($lang{DESCRIBE}, $modules->[0]->{descr} ||'', {INP=>'input', ID=>'DESCR'}).
+              label_w_txt($lang{NAME}, $modules->[0]->{module} || '', {INP=>'select', SELECT => \@mods, ID=>'MODULE' }).
+              label_w_txt($lang{STATUS}, $html->form_input('STATUS', 1, {
+                              TYPE => 'checkbox',
+                              STATE => $modules->[0]->{status}||undef
+                            })
+              ).
+              label_w_txt(undef, $html->form_input( 'SAVE', ( $FORM{chg} )? $lang{CHANGE} : $lang{CREATE}, {
+                              TYPE => 'SUBMIT'
+              }) . "	" .
+        			$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+        								  {RCOL => 3}),
       	    METHOD  => 'GET',
           	HIDDEN  => {
             				'index'    => $index,
             				'ID'       => $FORM{chg} || '',
                     'OBJECTID' => $FORM{OBJECTID},
-                    'DESCR'    => $modules->[0]->{descr}
           				},
         	});
   }

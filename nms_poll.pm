@@ -42,6 +42,7 @@ my $ctime = time;
 
 if ($argv->{INIT}) {
   nms_init();
+  return 1
 }
 
 nms_poll();
@@ -101,17 +102,6 @@ sub nms_init {
 
   foreach my $obj (@$obj_list) {
 
-    my $stats = $Nms->triggers_list({
-      COLS_NAME => 1,
-      OBJ_ID    => $obj->{id},
-      LABEL     => '_SHOW',
-      IID       => '_SHOW'
-    });
-    
-    if ($argv->{STATS} && $stats) {
-      stats($obj->{ip}, $stats);
-    }
-    
     if ($argv->{INIT}) {
       $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
       $snmpparms{DestHost} = $obj->{ip};
