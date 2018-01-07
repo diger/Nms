@@ -102,19 +102,17 @@ sub nms_init {
 
   foreach my $obj (@$obj_list) {
 
-    if ($argv->{INIT}) {
-      $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
-      $snmpparms{DestHost} = $obj->{ip};
-		  $sess = SNMP::Session->new(%snmpparms);
-		  print $obj->{ip} . "\n" if $debug > 0;
-      my @result = $sess->get($vl);
-      if (@result) {
-        print Dumper \@result if $debug > 0;
-          $Nms->sysobjectid_add({ 
-            OBJECTID => $result[0],
-            LABEL    => $SNMP::MIB{$result[0]}{label},
-          }) if $debug < 1;
-      }
+    $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
+    $snmpparms{DestHost} = $obj->{ip};
+	  $sess = SNMP::Session->new(%snmpparms);
+	  print $obj->{ip} . "\n" if $debug > 0;
+    my @result = $sess->get($vl);
+    if (@result) {
+      print Dumper \@result if $debug > 0;
+        $Nms->sysobjectid_add({ 
+          OBJECTID => $result[0],
+          LABEL    => $SNMP::MIB{$result[0]}{label},
+        }) if $debug < 1;
     }
   }
 
