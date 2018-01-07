@@ -218,6 +218,7 @@ sub cable_test_edit {
   }
   
   if ( $FORM{add} ) {
+    load_mibs({ OBJECTID => $FORM{OBJECTID} });
     my @labels;
     foreach my $oid (keys(%SNMP::MIB)) {
       if  ( $SNMP::MIB{$oid}{label} =~ /Cable/ || $SNMP::MIB{$oid}{label} =~ /cable/
