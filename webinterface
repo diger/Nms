@@ -15,6 +15,7 @@ require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
 use SNMP;
+use Nms::HTMLelem qw(label_w_txt table_header2);
 
 our ($html,
   %lang,
@@ -42,6 +43,68 @@ require Nms::util::NmsTraps;
 
 #**********************************************************
 
+=head2 nms_obj_list()
+
+=cut
+
+#**********************************************************
+sub nms_obj_list {
+  
+  my ($attr) = @_;
+  
+  $LIST_PARAMS{SORT} = $FORM{sort} || 1;
+  $LIST_PARAMS{STATUS} = $attr->{STATUS} || '_SHOW';
+ 
+  my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
+  my $so_index = get_function_index('sysobjectid_table');
+  my @status_bar = (
+    "$lang{ALL}:index=$index",
+    "$lang{ENABLED}:index=$index&STATUS=0",
+    "$lang{DISABLED}:index=$index&STATUS=1",
+  );
+  my ($table) = result_former({
+    INPUT_DATA      => $Nms,
+    FUNCTION        => 'obj_list',
+    BASE_FIELDS     => 1,
+    DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID, STATUS',
+    HIDDEN_FIELDS   => 'NAS_ID,ID,RO_COMMUNITY,RW_COMMUNITY',
+    FUNCTION_FIELDS => 'change,del',
+    EXT_TITLES      => {
+      ip       => 'IP',
+      name     => "$lang{NAME} NAS",
+    },
+    FILTER_COLS  => {
+      ip          => "search_link:nms_obj:,ID",
+      name        => "search_link:form_nas:,NAS_ID",
+      sysobjectid => "search_link:sysobjectid_table:,SYSOBJECTID",
+    },
+    SELECT_VALUE    => { sysobjectid => \%$oid_hash },
+    TABLE => {
+      caption    => ($attr->{MONIT})? $html->color_mark($lang{DISABLED},'#FF0000') : "$lang{LIST} - $lang{EQUIPMENT}",
+      qs         => $pages_qs,
+      ID         => 'OBJ_LIST',
+      header     => (!$attr->{MONIT})? $html->table_header(\@status_bar):undef,
+      DATA_TABLE => {
+        lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
+        ordering   => undef,
+        searching  => ($attr->{MONIT})? undef : 'true',
+        paging     => ($attr->{MONIT})? undef : 'true'
+      }
+    },
+    MAKE_ROWS       => 1,
+    SKIP_USER_TITLE => 1,
+    SKIP_PAGES      => 1,
+    TOTAL           => ($attr->{MONIT})? 0 : 1,
+    OUTPUT2RETURN   => 1
+  });
+  return $table->show() if $attr->{MONIT};
+  print $table;
+
+  return 1;
+}
+
+#**********************************************************
+
 =head2 nms_obj()
 
 =cut
@@ -51,7 +114,6 @@ sub nms_obj {
   
   my ($attr) = @_;
   
-  $LIST_PARAMS{SORT} = $FORM{sort} || 1;
   if ($FORM{del}){
     $Nms->obj_del($FORM{del})
   }
@@ -66,21 +128,6 @@ sub nms_obj {
   
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
   my $so_index = get_function_index('sysobjectid_table');
-  my $nms = $Nms->obj_list({
-    IP           => $FORM{IP} || '_SHOW',
-    NAS_NAME     => '_SHOW',
-    SYS_NAME     => '_SHOW',
-    SYS_LOCATION => '_SHOW',
-    SYS_OBJECTID => '_SHOW',
-    STATUS       => $attr->{STATUS} || $FORM{STATUS} || '_SHOW',
-    RO_COMMUNITY => '_SHOW',
-    RW_COMMUNITY => '_SHOW',
-    NAS_ID       => '_SHOW',
-    ID           => $FORM{ID} || $FORM{chg} || '_SHOW',
-    PAGE_ROWS    => 1000000,
-    COLS_NAME    => 1,
-    %LIST_PARAMS,
-  });
   
   if ( $FORM{SET} && $FORM{header} ) {
     return nms_snmp_set({
@@ -108,42 +155,54 @@ sub nms_obj {
           VALUE => $FORM{VALUE}
         })
   }
+  my $nms = $Nms->obj_list({
+    IP           => '_SHOW',
+    SYS_NAME     => '_SHOW',
+    SYS_LOCATION => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    STATUS       => '_SHOW',
+    RO_COMMUNITY => '_SHOW',
+    RW_COMMUNITY => '_SHOW',
+    ID           => $FORM{ID} || $FORM{OBJ_ID} || $FORM{chg},
+    COLS_NAME    => 1,
+  });
   if ( $FORM{chg} ) {
     print $html->form_main({
-          	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
-                        label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
-                        label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
-                        label_w_txt('SYS_OBJECTID', $html->element('a', $oid_hash->{$nms->[0]->{sysobjectid}},
-                        { href => "index.cgi?index=" . $so_index . "&SYSOBJECTID=" . $nms->[0]->{sysobjectid} })).
-                        label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>'input'}).
-                        label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>'input'}).
-                        label_w_txt($lang{STATUS},$nms->[0]->{status} || 0, {
-                          ID     =>'STATUS',
-                          INP    =>'select',
-                          SELECT => {
-                            0 => $lang{ENABLED},
-                            1 => $lang{DISABLED}
-                          }
-                        }).
-                        label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
-                            TYPE => 'SUBMIT'
-                          }) . "	" .
-      											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
-      								  {RCOL => 3}),
-      	    METHOD  => 'GET',
-          	HIDDEN  => {
-            				'index'    => $index,
-            				'OBJ_ID'   => $FORM{chg} || '',
-          				},
-            class => 'form-horizontal'
-        	});
+    	CONTENT =>  label_w_txt('IP', $nms->[0]->{ip}).
+                  label_w_txt($lang{NAME}, $nms->[0]->{sysname}).
+                  label_w_txt('SYS_LOCATION', $nms->[0]->{syslocation}).
+                  label_w_txt('SYS_OBJECTID', $html->element('a', $oid_hash->{$nms->[0]->{sysobjectid}},
+                  { href => "index.cgi?index=" . $so_index . "&SYSOBJECTID=" . $nms->[0]->{sysobjectid} })).
+                  label_w_txt('RO_COMMUNITY', $nms->[0]->{ro_community}, {INP=>'input'}).
+                  label_w_txt('RW_COMMUNITY', $nms->[0]->{rw_community}, {INP=>'input'}).
+                  label_w_txt($lang{STATUS},$nms->[0]->{status} || 0, {
+                    ID     =>'STATUS',
+                    INP    =>'select',
+                    SELECT => {
+                      0 => $lang{ENABLED},
+                      1 => $lang{DISABLED}
+                    }
+                  }).
+                  label_w_txt(undef, $html->form_input( 'SAVE', $lang{CHANGE}, {
+                      TYPE => 'SUBMIT'
+                    }) . "	" .
+											$html->button($lang{CANCEL}, "index=$index$pages_qs", {class =>"btn btn-default"}),
+								  {RCOL => 3}),
+	    METHOD  => 'GET',
+    	HIDDEN  => {
+      				'index'    => $index,
+      				'OBJ_ID'   => $FORM{chg} || '',
+    				},
+      class => 'form-horizontal'
+  	});
     return 1;
   }
 
   if ($FORM{ID} || $FORM{OBJ_ID} || $FORM{IP}) {
-    my $obj_id = $FORM{ID} || $FORM{OBJ_ID} || $nms->[0]->{id};
+    my $obj_id = $FORM{ID} || $FORM{OBJ_ID};
     $pages_qs .= "&ID=$obj_id";
-    my @header_arr = ("$lang{MAIN}:index=$index&visual=INFO$pages_qs");
+    my $head_index = "index.cgi?index=$index";
+    my @header_arr = [$lang{MAIN},"$head_index&visual=INFO$pages_qs"];
     my $oids = $Nms->oids_list({
       OBJECTID  => $nms->[0]->{sysobjectid},
       LABEL     => '_SHOW',
@@ -154,9 +213,10 @@ sub nms_obj {
       GROUP     => 'section'
     });
     my @main_btn;
+    my @tbls;
     foreach my $val (@$oids){
-      push @header_arr, "$val->{section}:index=$index&visual=$val->{section}$pages_qs" if $val->{type} eq 'table';
-      push @main_btn, $html->button( $lang{RESTART}, "index=$index$pages_qs&VALUE=$val->{label}&LABEL=$val->{label}",{
+      push @tbls, [$val->{section},"$head_index&visual=$val->{section}$pages_qs"] if $val->{type} eq 'table';
+      push @main_btn, $html->button( $lang{RESTART}, "$head_index$pages_qs&VALUE=$val->{label}&LABEL=$val->{label}",{
         CONFIRM   => "$lang{RESTART} $nms->[0]->{ip} ?",
         ICON      => 'glyphicon glyphicon-repeat text-danger',
         class     => 'btn btn-default'
@@ -167,12 +227,13 @@ sub nms_obj {
         class     => 'btn btn-default'
       }) if $val->{section} eq 'write';
     };
+    push @header_arr, ['Tables', undef, \@tbls];
     if ( $Nms->triggers_list({ OBJ_ID => $obj_id }) ) {
-      push @header_arr, "$lang{STATS}:index=$index&visual=STATS$pages_qs";
+      push @header_arr, [$lang{STATS},"$head_index&visual=STATS$pages_qs"];
     }
-    push @header_arr, "MIBs Browser:index=$index&visual=MIB_BR$pages_qs";
-    
-    my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
+    push @header_arr, ['MIBs Browser',"$head_index&visual=MIB_BR$pages_qs"];
+
+    my $buttons = table_header2( \@header_arr, { TABS => 1 } );
     if ($buttons) {
       my $obj_select = $html->form_select(
          'ID',
@@ -208,7 +269,10 @@ sub nms_obj {
          }
       );
 
-      print $html->element('div', $obj_select_form . $buttons, { class => 'navbar navbar-default' }) if !$FORM{IN_MODAL};
+      print $html->element('nav', $obj_select_form . $buttons, {
+        class => 'navbar navbar-default',
+        style => 'margin-bottom: 0px;'
+       }) if !$FORM{IN_MODAL};
     }
 
     my $visual = $FORM{visual} || 'INFO';
@@ -222,52 +286,11 @@ sub nms_obj {
       mibs_browser({ ID => $obj_id });
     } 
     else {
-      oid_table({ ID => $obj_id, SECT => $visual, OBJECTID  => $nms->[0]->{sysobjectid} });
+      nms_snmp_table({ ID => $obj_id, SECT => $visual });
     }
   }
-  elsif ($Nms->{TOTAL} != 0) {
-    my @status_bar = (
-      "$lang{ALL}:index=$index",
-      "$lang{ENABLED}:index=$index&STATUS=0",
-      "$lang{DISABLED}:index=$index&STATUS=1",
-    );
-    my ($table) = result_former({
-      INPUT_DATA      => $Nms,
-      LIST            => $nms,
-      BASE_FIELDS     => 1,
-      DEFAULT_FIELDS  => 'IP, NAS_NAME, SYS_NAME, SYS_LOCATION, SYS_OBJECTID, STATUS',
-      HIDDEN_FIELDS   => 'NAS_ID,ID,RO_COMMUNITY,RW_COMMUNITY',
-      FUNCTION_FIELDS => 'change,del',
-      EXT_TITLES      => {
-        ip       => 'IP',
-        name     => "$lang{NAME} NAS",
-      },
-      FILTER_COLS  => {
-        ip          => "search_link:nms_obj:,ID",
-        name        => "search_link:form_nas:,NAS_ID",
-        sysobjectid => "search_link:sysobjectid_table:,SYSOBJECTID",
-      },
-      SELECT_VALUE    => { sysobjectid => \%$oid_hash },
-      TABLE => {
-        caption    => ($attr->{MONIT})? $html->color_mark($lang{DISABLED},'#FF0000') : "$lang{LIST} - $lang{EQUIPMENT}",
-        qs         => $pages_qs,
-        ID         => 'OBJ_LIST',
-        header     => (!$attr->{MONIT})? $html->table_header(\@status_bar):undef,
-        DATA_TABLE => {
-          lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
-          ordering   => undef,
-          searching  => ($attr->{MONIT})? undef : 'true',
-          paging     => ($attr->{MONIT})? undef : 'true'
-        }
-      },
-      MAKE_ROWS       => 1,
-      SKIP_USER_TITLE => 1,
-      SKIP_PAGES      => 1,
-      TOTAL           => ($attr->{MONIT})? 0 : 1,
-      OUTPUT2RETURN   => 1
-    });
-    return $table->show() if $attr->{MONIT};
-    print $table;
+  else {
+    nms_obj_list({ STATUS => $FORM{STATUS} });
   }
   return 1;
 }
@@ -346,64 +369,6 @@ sub nms_obj_data {
 
 #**********************************************************
 
-=head2 oid_table()
-
-=cut
-
-#**********************************************************
-sub oid_table {
-
-  my ($attr) = @_;
-
-  my $info = $Nms->obj_list({
-    COLS_NAME    => 1,
-    ID           => $FORM{ID}||$attr->{ID},
-    IP           => '_SHOW',
-    SYS_OBJECTID => '_SHOW',
-    }
-  );
-
-  my $prm = load_mibs({ ID => $attr->{ID}});
-  my $tbl = $Nms->oids_list(
-    {
-      COLS_NAME => 1,
-      SECTION   => $FORM{SECT}||$attr->{SECT},
-      OBJECTID  => $prm->{sysobjectid},
-      TYPE      => 'table',
-      LABEL     => '_SHOW',
-    }
-  );
- 
-  my @tab_cont;
-  my @header_arr;
-
-  foreach my $t (@$tbl) {
-    my $rows = $Nms->oids_rows_list({ ID => $t->{id} });
-    my @vars;
-    foreach my $row (@$rows) {
-      push @vars, $row->[1];
-    }
-
-    push @tab_cont, $html->element('div', nms_snmp_table({
-      SECT => $attr->{SECT},
-      OID => $t->{label},
-      columns => [ @vars ],
-      IP => $info->[0]->{ip}
-    }), { id => $t->{label}, class => "tab-pane fade" . (( @tab_cont < 1 )?'in active':'') });
-    push @header_arr, "$t->{label}:#$t->{label}:data-toggle='tab'"; 
-  }
-
-  my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
-  my $edit = $html->button($lang{EDIT}, "index=$index&edit=1", { ICON => 'fa fa-pencil-square-o', });
-  my $tab = $html->element('div', "@tab_cont", { class => 'tab-content' });
-
-  print $buttons . $tab;
-
-  return 1;
-}
-
-#**********************************************************
-
 =head2 nms_snmp_set()
 
 =cut
@@ -464,25 +429,51 @@ sub nms_snmp_set {
 sub nms_snmp_table {
 
   my ($attr) = @_;
-  $snmpparms{UseSprintValue} = 1;
-  $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
-  my $sess = SNMP::Session->new(DestHost => $attr->{IP},%snmpparms);
-
-  if (!$attr->{columns}){
-	    foreach my $c (sort { $b <=> $a } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
-			push @{$attr->{columns}}, $c->{'label'};
-	    }
+  my $prm = load_mibs({ ID => $attr->{ID}});
+  
+  my $visual = ($FORM{visual})? "&visual=$FORM{visual}": '';
+  my @columns;
+  my $tbl;
+  my @header_arr;
+  if (!$attr->{OID}) {
+    $tbl = $Nms->oids_list(
+      {
+        COLS_NAME => 1,
+        SECTION   => $FORM{SECT}||$attr->{SECT},
+        OBJECTID  => $prm->{sysobjectid},
+        TYPE      => 'table',
+        LABEL     => '_SHOW',
+      }
+    );
+    my $rows = $Nms->oids_rows_list({ ID => $FORM{TBL_ID} || $tbl->[0]->{id} });
+    foreach my $row (@$rows) {
+      push @columns, $row->[1];
+    }
+    if (@$tbl > 1) {
+      foreach my $t (@$tbl) {
+        push @header_arr, "$t->{label}:index=$index$pages_qs$visual&TBL_ID=$t->{id}"; 
+      }
+    }
   }
-
-  my $results = $sess->gettable( $attr->{OID}, columns => [@{$attr->{columns}}] );
+  else {
+    foreach my $c (sort { $b <=> $a } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
+      push @columns, $c->{'label'};
+    }
+  }
+  
+  $snmpparms{UseSprintValue} = 1;
+  $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
+  my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
+  my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns] );
   if ( $sess->{ErrorNum} ) {
 	return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
- 
   my $table = $html->table(
     {
-      ID          => $attr->{OID},
-      title_plain => [ @{$attr->{columns}} ],
+      ID          => $attr->{OID} || $tbl->[0]->{label},
+      caption     => (!$attr->{OID})? $attr->{SECT} : undef,
+      header      => $html->table_header(\@header_arr),
+      title_plain => [@columns],
       DATA_TABLE  => {
         ordering   => undef,
         lengthMenu => [[28, 52, -1],[28, 52, $lang{ALL}]],
@@ -490,10 +481,9 @@ sub nms_snmp_table {
     }
   );
 
-  my $visual = ($FORM{visual})? "&visual=$FORM{visual}": '';
   foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
 	  my @row = ();
-	  foreach my $ind (@{$attr->{columns}}){
+	  foreach my $ind (@columns){
       if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
   			$results->{$var}->{$ind} =~ s/"|\n//g;
   			my @in_hex = split(/ /, $results->{$var}->{$ind});
@@ -554,7 +544,8 @@ sub nms_snmp_table {
     </script>
   ); 
 
-  return $table->show();
+  print $table->show();
+  return 1
 }
 
 #**********************************************************
@@ -646,7 +637,7 @@ sub mibs_browser {
       print $result_tbl->show();
     } 
     elsif ($FORM{TABLE}){
-      print nms_snmp_table({ IP => $obj->{ip}, OID => $FORM{OID}});
+      nms_snmp_table({ ID => $FORM{TABLE}, OID => $FORM{OID}});
     } 
     elsif ($FORM{SET}){
       nms_snmp_set({ IP => $obj->{ip}, OID => $FORM{OID}});
@@ -901,69 +892,6 @@ sub nms_trigger {
   return 1
 }
 
-#**********************************************************
-=head2 label_w_txt($label,$text,$attr); - return formated text with label
-
-  Arguments:
-    $label - text of label
-    $text 
-    $attr -
-      CTRL - for form with input control
-      COLOR - color of label
-      ID - 
-      TYPE -
-      LCOL
-      RCOL
-      
-  Returns:
-    String with element
-
-=cut
-#**********************************************************
-sub label_w_txt {
-	my ($label,$text,$attr) = @_;
-	my $class = ($attr->{COLOR}) ? "label-$attr->{COLOR}" : '' ;
-  $class = ($attr->{ICON})? ' has-feedback' : '' ;
-  my $flabel =  $html->element(($attr->{INP})? 'span' : 'label', $label, {
-    class => 'control-label col-sm-' . ($attr->{LCOL}||'2'),
-    for => $attr->{ID} || $label
-  });
-  my %ex_attr = (
-    class => ($attr->{INP})?'form-control':'form-control-static',
-    id => $attr->{ID} || $label,
-    name => $attr->{ID} || $label,
-    type => $attr->{TYPE} || undef,
-    placeholder => ($attr->{HOLDER})? $attr->{HOLDER} : undef
-  );
-  my @sels;
-  if ($attr->{SELECT} && ref($attr->{SELECT}) eq 'ARRAY'){
-    foreach my $opt (@{$attr->{SELECT}}){
-      my $op = $html->element('option', $opt, { value => $opt});
-      $op =~ s/<option /<option selected / if $text eq $opt ;
-      push @sels, $op
-    }
-    $text = "@sels";
-  }
-  elsif ($attr->{SELECT} && ref($attr->{SELECT}) eq 'HASH') {
-    while ( my ($key, $value) = each (%{$attr->{SELECT}}) ){
-      my $op = $html->element('option', $value, { value => $key});
-      $op =~ s/<option /<option selected / if $text eq $key ;
-      push @sels, $op
-    }
-    $text = "@sels";
-  }
-  $ex_attr{value} = ($attr->{INP} && $attr->{INP} eq 'input')? $text : undef;
-  $text = (!$attr->{INP} || $attr->{INP} ne 'input')? $text : '';
-  my $ftext =  $html->element(($attr->{INP})?$attr->{INP}:'p', $text, \%ex_attr);
-  $ftext .= $html->element('span', undef,
-    {
-      id    => $attr->{ID} || $label,
-      class => $attr->{ICON} . ' form-control-feedback'
-    }) if $attr->{ICON};
-  $ftext = $html->element('div', $ftext, { class => 'col-sm-' . ($attr->{RCOL}||'3') . $class });
-	
-	return $html->element('div', $flabel.$ftext, { class => 'form-group' . $class });
-}
 #**********************************************************
 
 =head2 sysobjectid_table()
@@ -1313,7 +1241,7 @@ sub make_tree {
 sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
-  my $page = nms_obj({ STATUS => 1, MONIT => 1 });
+  my $page = nms_obj_list({ STATUS => 1, MONIT => 1 });
   if ($page eq '1') {
     $page = nms_trigger({ MONIT => 1 });
   }
@@ -1609,5 +1537,6 @@ sub nms_reports_setup {
 sub nms_reports {
   return 1
 }
+
 
 1;

@@ -64,7 +64,6 @@ sub nms_traps {
       $rows .= $html->element('div', $SNMP::MIB{$val->[2]}{label} || $val->[2], {class => 'col-sm-6', title => $val->[2]});
       print $html->element('div', $rows,{class => 'row'});
     }
-
     return 1
   }
 
