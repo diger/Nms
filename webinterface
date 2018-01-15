@@ -97,7 +97,8 @@ sub nms_obj_list {
     TOTAL           => ($attr->{MONIT})? 0 : 1,
     OUTPUT2RETURN   => 1
   });
-  return $table->show() if $attr->{MONIT};
+
+  return [ $table->show(), $Nms->{TOTAL} ] if $attr->{MONIT};
   print $table;
 
   return 1;
@@ -1241,9 +1242,13 @@ sub make_tree {
 sub nms_monitor {
   my ($attr) = @_;
   my $traps_pg_rows = $FORM{FILTER} || 10;
-  my $page = nms_obj_list({ STATUS => 1, MONIT => 1 });
-  if ($page eq '1') {
+  my $olist = nms_obj_list({ STATUS => 1, MONIT => 1 });
+  my $page;
+  if ($olist->[1] == 0) {
     $page = nms_trigger({ MONIT => 1 });
+  }
+  else {
+    $page = $olist->[0]
   }
   $page .= nms_traps({ PAGE_ROWS => 10, MONIT => 1 });
 
