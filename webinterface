@@ -382,6 +382,7 @@ sub nms_snmp_set {
   if ($FORM{IN_MODAL}){
     my %enums = oid_enums($attr->{LABEL});
     my %vals = reverse %enums;
+    my $obj_index = get_function_index('nms_obj');
     print $html->form_main({
       CONTENT =>
         (($FORM{IID})? label_w_txt('IID',$attr->{IID}) : '').
@@ -400,7 +401,7 @@ sub nms_snmp_set {
               class => 'btn btn-default' }), {RCOL => 8}),
 	    METHOD  => 'GET',
     	HIDDEN  => {
-        'index'  => $index,
+        'index'  => $obj_index,
         'visual' => $FORM{visual},
         'ID'     => $attr->{ID},
         'LABEL'  => $attr->{LABEL},
