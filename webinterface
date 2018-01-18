@@ -157,7 +157,7 @@ sub nms_obj {
         })
   }
   my $nms = $Nms->obj_list({
-    IP           => '_SHOW',
+    IP           => $FORM{IP} || '_SHOW',
     SYS_NAME     => '_SHOW',
     SYS_LOCATION => '_SHOW',
     SYS_OBJECTID => '_SHOW',
@@ -200,7 +200,7 @@ sub nms_obj {
   }
 
   if ($FORM{ID} || $FORM{OBJ_ID} || $FORM{IP}) {
-    my $obj_id = $FORM{ID} || $FORM{OBJ_ID};
+    my $obj_id = $FORM{ID} || $FORM{OBJ_ID} || $nms->[0]->{id};
     $pages_qs .= "&ID=$obj_id";
     my $head_index = "index.cgi?index=$index";
     my @header_arr = [$lang{MAIN},"$head_index&visual=INFO$pages_qs"];
@@ -233,6 +233,7 @@ sub nms_obj {
       push @header_arr, [$lang{STATS},"$head_index&visual=STATS$pages_qs"];
     }
     push @header_arr, ['MIBs Browser',"$head_index&visual=MIB_BR$pages_qs"];
+    push @header_arr, [$lang{EVENTS},"$head_index&visual=TRAPS$pages_qs"];
 
     my $buttons = table_header2( \@header_arr, { TABS => 1 } );
     if ($buttons) {
@@ -285,7 +286,10 @@ sub nms_obj {
     } 
     elsif ($visual eq 'MIB_BR') {
       mibs_browser({ ID => $obj_id });
-    } 
+    }
+    elsif ($visual eq 'TRAPS') {
+      nms_traps({ IP => $nms->[0]->{ip} });
+    }
     else {
       nms_snmp_table({ ID => $obj_id, SECT => $visual });
     }

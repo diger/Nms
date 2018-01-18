@@ -47,10 +47,8 @@ sub nms_traps {
   if ($attr->{PAGE_ROWS} || $FORM{PAGE_ROWS}){
 	  $LIST_PARAMS{PAGE_ROWS} = $attr->{PAGE_ROWS} || $FORM{PAGE_ROWS};
   }
-  if ($FORM{NAS_ID}){
-    $LIST_PARAMS{NAS_ID} = $FORM{NAS_ID};
-  }
-  if ($FORM{ID}){
+  $LIST_PARAMS{IP} = $attr->{IP};
+  if (!$attr->{IP} && $FORM{ID}){
     my $values = $Traps->trap_values($FORM{ID});
     foreach my $val (@$values){
       if ( $SNMP::MIB{$val->[1]}{syntax} eq 'OCTETSTR' || $SNMP::MIB{$val->[1]}{syntax} eq 'PhysAddress' ){
@@ -70,12 +68,12 @@ sub nms_traps {
   my ($table,$list) = result_former({
     INPUT_DATA      => $Traps,
     FUNCTION        => 'traps_list',
-    DEFAULT_FIELDS  => 'TRAPTIME, IP, LABEL, TIMETICKS',
+    DEFAULT_FIELDS  => 'TRAPTIME, IP, SYS_NAME, LABEL, TIMETICKS',
 #    FUNCTION_FIELDS => 'nms_traps:stats:id;&pg='.($FORM{pg}||''),
     HIDDEN_FIELDS   => 'ID,OID',
     EXT_TITLES      => {
       traptime => $lang{TIME},
-      label     => $lang{NAME},
+      label    => $lang{EVENTS},
       ip       => "IP ".$lang{ADDRESS},
     },
     SKIP_USER_TITLE => 1,

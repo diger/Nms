@@ -51,19 +51,21 @@ sub traps_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : '';
 
   my $WHERE =  $self->search_former($attr, [
-    ['ID',        'INT',  'id',                    1 ],
-    ['TRAPTIME',  'DATE', 'traptime',              1 ],
-    ['IP',        'IP',   'ip', 'INET_NTOA(ip) AS ip'],
-    ['LABEL',     'STR',  'label',                 1 ],
-    ['OID',       'STR',  'oid',                   1 ],
-	  ['TIMETICKS', 'STR',  'timeticks',             1 ],
+    ['ID',        'INT',  't.id',                      1 ],
+    ['TRAPTIME',  'DATE', 'traptime',                  1 ],
+    ['IP',        'IP',   't.ip', 'INET_NTOA(t.ip) AS ip'],
+    ['SYS_NAME',  'STR',  'sysname',                   1 ],
+    ['LABEL',     'STR',  'label',                     1 ],
+    ['OID',       'STR',  'oid',                       1 ],
+	  ['TIMETICKS', 'STR',  'timeticks',                 1 ],
     ],
     { WHERE => 1,
     }
   );
 
-  $self->query2("SELECT $self->{SEARCH_FIELDS} id
-    FROM nms_traps
+  $self->query2("SELECT $self->{SEARCH_FIELDS} t.id as id
+    FROM nms_traps t
+    LEFT JOIN nms_obj n ON (n.ip=t.ip)
     $WHERE
     ORDER BY $SORT $DESC
     LIMIT $PG, $PAGE_ROWS;",
