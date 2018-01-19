@@ -23,9 +23,6 @@ our(
   $db
 );
 
-my $Dv = Dv->new( $db, $admin, \%conf );
-my $Dhcphosts = Dhcphosts->new( $db, $admin, \%conf );
-
 #**********************************************************
 =head2 cable_test()
 
@@ -33,48 +30,10 @@ my $Dhcphosts = Dhcphosts->new( $db, $admin, \%conf );
 #**********************************************************
 sub cable_test {
   my ($attr) = @_;
-  my $user = $Dv->list({ UID => $FORM{UID}, CID => '_SHOW' });
   my $nms_index = get_function_index('nms_obj');
 
-  my $dhcp = $Dhcphosts->hosts_list({
-      COLS_NAME => 1,
-      PORTS     => '_SHOW',
-      MAC       => $user->[0]->[0],
-      NAS_ID    => '_SHOW',
-    }
-  );
-
-  my $mod = $Nms->obj_list(
-    {
-      COLS_NAME    => 1,
-      NAS_ID       => $dhcp->[0]->{nas_id},
-      IP           => '_SHOW',
-      NAS_NAME     => '_SHOW',
-      SYS_OBJECTID => '_SHOW',
-    }
-  );
-
-  my $table = $html->table(
-      {
-          width       => '100%',
-          caption    => "MAC: $user->[0]->[0]",
-          title_plain => [ $lang{NAME}, 'IP', $lang{PORT} ],
-          ID          => "CABLE_TEST",
-          HAS_FUNCTION_FIELDS => 1
-      }
-    );
-  $table->addrow( $mod->[0]->{name}, $mod->[0]->{ip}, $dhcp->[0]->{ports},
-  $html->button('', "index=$nms_index&ID=". $mod->[0]->{id} ,
-          {
-          ICON  => 'glyphicon glyphicon-random text-info',
-          title => $lang{DEL},
-          }
-        )
-  );
-
-  print $table->show();
   my $test_param = $Nms->oids_list({
-    OBJECTID  => $mod->[0]->{sysobjectid},
+    OBJECTID  => $attr->{OBJECTID},
     LABEL     => '_SHOW',
     SECTION   => '_SHOW',
     TYPE      => 'cable',
@@ -86,19 +45,19 @@ sub cable_test {
 
   foreach my $key (keys %$test_param) {
     $mib =  $key if $test_param->{$key} eq 'action';
-    push @vars, [$key,$dhcp->[0]->{ports}] if $test_param->{$key} ne 'action';
+    push @vars, [$key,$attr->{PORT}] if $test_param->{$key} ne 'action';
     push @{$pair{$test_param->{$key}}}, $key;
   }
 
-  load_mibs({ OBJECTID => $mod->[0]->{sysobjectid} });
+  load_mibs({ OBJECTID => $attr->{OBJECTID} });
   my %snmpparms;
   $snmpparms{Version} = 2;
   $snmpparms{Retries} = 1;
   $snmpparms{Timeout} = 2000000;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
-  my $sess = SNMP::Session->new(DestHost => $mod->[0]->{ip}, %snmpparms);
+  my $sess = SNMP::Session->new(DestHost => $attr->{IP}, %snmpparms);
   my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-  my $vb = SNMP::Varbind->new([$mib,$dhcp->[0]->{ports},$value]);
+  my $vb = SNMP::Varbind->new([$mib,$attr->{PORT},$value]);
   $sess->set($vb);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});

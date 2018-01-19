@@ -15,7 +15,7 @@ require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
 use SNMP;
-use Nms::HTMLelem qw(label_w_txt table_header2);
+use Nms::HTMLelem qw(label_w_txt table_header2 make_tree);
 
 our ($html,
   %lang,
@@ -56,7 +56,7 @@ sub nms_obj_list {
   $LIST_PARAMS{STATUS} = $attr->{STATUS} || '_SHOW';
  
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
-  my $so_index = get_function_index('sysobjectid_table');
+  my $so_index = get_function_index('nms_sysobjectid');
   my @status_bar = (
     "$lang{ALL}:index=$index",
     "$lang{ENABLED}:index=$index&STATUS=0",
@@ -76,7 +76,7 @@ sub nms_obj_list {
     FILTER_COLS  => {
       ip          => "search_link:nms_obj:,ID",
       name        => "search_link:form_nas:,NAS_ID",
-      sysobjectid => "search_link:sysobjectid_table:,SYSOBJECTID",
+      sysobjectid => "search_link:nms_sysobjectid:,SYSOBJECTID",
     },
     SELECT_VALUE    => { sysobjectid => \%$oid_hash },
     TABLE => {
@@ -128,7 +128,7 @@ sub nms_obj {
   }
   
   my $oid_hash = $Nms->sysobjectid_list({LABEL => '_SHOW', LIST2HASH  => 'objectid,label'});
-  my $so_index = get_function_index('sysobjectid_table');
+  my $so_index = get_function_index('nms_sysobjectid');
   
   if ( $FORM{SET} && $FORM{header} ) {
     return nms_snmp_set({
@@ -235,7 +235,7 @@ sub nms_obj {
     push @header_arr, ['MIBs Browser',"$head_index&visual=MIB_BR$pages_qs"];
     push @header_arr, [$lang{EVENTS},"$head_index&visual=TRAPS$pages_qs"];
 
-    my $buttons = table_header2( \@header_arr, { TABS => 1 } );
+    my $buttons = table_header2( \@header_arr);
     if ($buttons) {
       my $obj_select = $html->form_select(
          'ID',
@@ -605,7 +605,7 @@ sub mibs_browser {
 
   my $obj;
   my $root_index = get_function_index('mibs_browser');
-  my $mods_index = get_function_index('modules_table');
+  my $mods_index = get_function_index('nms_modules');
   my $ID = $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW} || 0 ;
   $pages_qs = $pages_qs . "&ID=$ID";
   
@@ -900,12 +900,12 @@ sub nms_trigger {
 
 #**********************************************************
 
-=head2 sysobjectid_table()
+=head2 nms_sysobjectid()
 
 =cut
 
 #**********************************************************
-sub sysobjectid_table {
+sub nms_sysobjectid {
 
   my ($attr) = @_;
 
@@ -916,7 +916,7 @@ sub sysobjectid_table {
       FUNCTION        => 'sysobjectid_list',
     #  DEFAULT_FIELDS  => 'SYSORID, MODULE, STATUS',
       DEFAULT_FIELDS  => 'LABEL, OBJECTID',
-      FUNCTION_FIELDS => 'modules_table:modules:objectid,oids_set:oids:objectid',
+      FUNCTION_FIELDS => 'nms_modules:modules:objectid,oids_set:oids:objectid',
       SKIP_USER_TITLE => 1,
       FILTER_COLS  => {
 #        ip   => "search_link:nms_obj:,ID",
@@ -935,12 +935,12 @@ sub sysobjectid_table {
 }
 #**********************************************************
 
-=head2 modules_table()
+=head2 nms_modules()
 
 =cut
 
 #**********************************************************
-sub modules_table {
+sub nms_modules {
   my ($attr) = @_;
 
   $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
@@ -1131,110 +1131,6 @@ sub mibs_tree {
   }
   return \%labels if $attr->{LABEL} || $attr->{HASH} || $attr->{SYNTAX};
   return make_tree( @tree_arr );
-}
-
-#**********************************************************
-=head2 make_tree($attr) - Make different charts
-
-   If given only one series and X_TEXT as YYYY-MM, will build columned compare chart
-
-   Arguments:
-     $attr
-       DATA    - Data array of hashes
-   Result:
-     TRUE or FALSE
-
-=cut
-#**********************************************************
-sub make_tree {
-  my (@data) = @_;
-  my $result = '';
-  my $TREE_ID = 'MY_TREE';
-  my $DATA  = JSON->new->encode(\@data);
-  
-  $result.= qq{
-    <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
-    <script type='text/javascript' src='/styles/lte_adm/plugins/jstree/jstree.min.js'></script>
-    <div id=$TREE_ID></div>
-  };
-  $result.= qq(
-    <script>
-      jQuery('#$TREE_ID').jstree({
-    		'core' : {
-          'themes': {
-            'name': 'proton',
-            'responsive': true
-          },
-          'data' : $DATA
-        },
-        'plugins' : [ 'contextmenu', 'types', 'search' ],
-        'search': {
-          'case_insensitive': true,
-          'show_only_matches' : false
-        },
-        'contextmenu' : {
-          'items' : customMenu
-        },
-        'types' : {
-          'table' : {
-                'icon' : 'glyphicon glyphicon-list-alt'
-              },
-          'row' : {
-                'icon' : 'glyphicon glyphicon-option-horizontal'
-              },
-          'scalar' : {
-                'icon' : 'glyphicon glyphicon-file'
-              }
-        }
-    	});
-      function customMenu(node) {
-          var items = {
-              Get: {
-                  label: 'Get',
-                  icon : 'glyphicon glyphicon-download',
-                  action: function () {
-                    renewLeftBox(node.text,'GET',id);
-                  }
-              },
-              Table: { 
-                  label: 'Table',
-                  icon : 'glyphicon glyphicon-list-alt',
-                  action: function () {
-                    renewLeftBox(node.text,'TABLE',id);
-                  }
-              },
-              Walk: { 
-                  label: 'Walk',
-                  icon : 'glyphicon glyphicon-circle-arrow-down',
-                  action: function () {
-                    renewLeftBox(node.text,'WALK',id);
-                  }
-              }
-          };
-
-          if (node.type === 'scalar') {
-            delete items.Table;
-            delete items.Walk;            
-          }
-          else if (node.type === 'row') {
-            delete items.Get;
-            delete items.Table;
-          }
-          else if (node.type === 'table') {
-            delete items.Get;
-          }
-          else {
-            delete items.Table;
-            delete items.Walk;
-            delete items.Get;
-          }
-
-          return items;
-      }
-	  </script>
-   );
-
-  return $result;
 }
 
 #**********************************************************
@@ -1548,5 +1444,134 @@ sub nms_reports {
   return 1
 }
 
+#**********************************************************
+
+=head2 nms_client_obj()
+
+=cut
+
+#**********************************************************
+sub nms_client_obj {
+  my ($attr) = @_;
+  my $Dhcphosts = Dhcphosts->new( $db, $admin, \%conf );
+  my $nms_index = get_function_index('nms_obj');
+
+  my $dhcp = $Dhcphosts->hosts_list({
+      COLS_NAME => 1,
+      PORTS     => '_SHOW',
+      UID       => $FORM{UID},
+      MAC       => '_SHOW',
+      NAS_ID    => '_SHOW',
+    }
+  );
+  
+  if ($dhcp){
+    my $nms = $Nms->obj_list(
+      {
+        COLS_NAME    => 1,
+        NAS_ID       => $dhcp->[0]->{nas_id},
+        IP           => '_SHOW',
+        NAS_NAME     => '_SHOW',
+        SYS_OBJECTID => '_SHOW',
+      }
+    );
+    if ($FORM{IN_MODAL}){
+      cable_test({
+        OBJECTID => $nms->[0]->{sysobjectid},
+        IP       => $nms->[0]->{ip},
+        PORT     => $dhcp->[0]->{ports}
+      });
+      return 1
+    }
+    load_mibs({OBJECTID => $nms->[0]->{sysobjectid}});
+    my $table = $html->table(
+        {
+            width       => '100%',
+            caption    => "MAC: $dhcp->[0]->{mac}",
+            title_plain => [ $lang{NAME}, 'IP', $lang{PORT} ],
+            ID          => "CABLE_TEST",
+            HAS_FUNCTION_FIELDS => 1
+        }
+      );
+    $table->addrow(
+      $html->element('a', $nms->[0]->{name}, { href => "index.cgi?index=$nms_index&ID=$nms->[0]->{id}" }),
+      $nms->[0]->{ip},
+      $dhcp->[0]->{ports},
+      $html->button('CableTest', undef,
+              {
+                JAVASCRIPT     => '',
+                SKIP_HREF      => 1,
+                NO_LINK_FORMER => 1,
+                ICON           => 'glyphicon glyphicon-random text-info',
+                ex_params      => qq/onclick=\"loadToModal('index.cgi?qindex=$index$pages_qs&header=2')\"/
+              }
+            )
+    );
+    print $table->show();
+
+    my $oids = $Nms->oids_list(
+      {
+        COLS_NAME => 1,
+        OBJECTID  => $nms->[0]->{sysobjectid},
+        TYPE      => 'table',
+        LABEL     => '_SHOW',
+      }
+    );
+
+    my @mibs;
+    foreach my $oid (@$oids){
+      if ( grep{ $_ =~ /ifIndex|PortIndex/ } @{$SNMP::MIB{$oid->{label}}{children}[0]{indexes}} ) {
+        my $rows = $Nms->oids_rows_list(
+          {
+            COLS_NAME => 1,
+            ID        => $oid->{id},
+            LABEL     => '_SHOW',
+          }
+        );
+        foreach my $row (@$rows){
+           push @mibs, [$row->{label},$dhcp->[0]->{ports}];
+        }
+      }
+    }
+    my $vb = SNMP::VarList->new(@mibs);
+    my $sess = SNMP::Session->new(
+      %snmpparms,
+      Community => $conf{NMS_COMMUNITY_RO},
+      DestHost  => $nms->[0]->{ip},
+    );
+    $sess->get($vb);
+    my @res;
+    my $res_table = $html->table(
+        {
+            title_plain => [ $lang{NAME}, 'Value' ],
+            ID          => "PORT_RESULT",
+            HAS_FUNCTION_FIELDS => 1
+        }
+      );
+    foreach my $vl (@$vb){
+      if ($vl->[0] !~ /ifIndex|PortIndex/ ){
+        my $edit = ($SNMP::MIB{$vl->[0]}{access} && $SNMP::MIB{$vl->[0]}{access} =~ /ReadWrite|WriteOnly/)?
+          $html->button( $lang{CHANGE}, undef,{
+            JAVASCRIPT     => '',
+            SKIP_HREF      => 1,
+            NO_LINK_FORMER => 1,
+            class          => "change",
+            title          => $lang{ADD},
+            ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&SET=$vl->[0]&VAL=$vl->[2]')\"/
+          }) :'';
+        $res_table->addrow( $html->b($vl->[0]), $vl->[2], $edit );
+      }
+    }
+    print $res_table->show();
+    
+    #cable_test({ OBJECTID=>$mod->[0]->{sysobjectid} });
+    
+  }
+  else {
+    print $html->message('warning', '', "MAC address is not exists");
+  }
+  
+  return 1
+}
 
 1;

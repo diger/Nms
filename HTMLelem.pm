@@ -8,6 +8,7 @@ our @ISA    = qw/ Exporter /;
 our @EXPORT = qw(
 label_w_txt
 table_header2
+make_tree
 );
 #**********************************************************
 =head2 label_w_txt($label,$text,$attr); - return formated text with label
@@ -88,24 +89,128 @@ sub table_header2 {
     my $drop = ($elem->[2])? 'dropdown':undef;
     my @dr_menu;
     my $lidr;
-    if ($elem->[2]){
-      $lidr = $html->element('a', $elem->[0].$html->element('span',undef,{ class=>'caret'}), {
+    if ($elem->[2] && ref($elem->[2]) eq 'ARRAY'){
+      $lidr = $html->element('a', $elem->[0].$html->element('span', undef, { class => 'caret' }), {
         href          => '#',
         class         => 'dropdown-toggle',
         'data-toggle' => 'dropdown'
       });
       foreach my $mn ( @{$elem->[2]} ) {
-        push @dr_menu, $html->li($html->element('a', $mn->[0],{href=>$mn->[1]}));
+        push @dr_menu, $html->li($html->element('a', $mn->[0], { href => $mn->[1] }));
       }
       $lidr = $html->li($lidr . $html->element('ul', "@dr_menu", { class => 'dropdown-menu'}), { class => 'dropdown' });
     }
     else {
-      $lidr = $html->element('a', $elem->[0],{href=>$elem->[1]});
+      $lidr = $html->element('a', $elem->[0],{ href => $elem->[1], 'data-toggle' => ($elem->[2])?'tab':undef });
     }
     push @navs, $html->li($lidr, { class => $drop });
   }
 
   return $html->element('ul', "@navs", { class => 'nav navbar-nav' })
+}
+
+#**********************************************************
+=head2 make_tree($attr) - Make different charts
+
+   If given only one series and X_TEXT as YYYY-MM, will build columned compare chart
+
+   Arguments:
+     $attr
+       DATA    - Data array of hashes
+   Result:
+     TRUE or FALSE
+
+=cut
+#**********************************************************
+sub make_tree {
+  my (@data) = @_;
+  my $result = '';
+  my $TREE_ID = 'MY_TREE';
+  my $DATA  = JSON->new->encode(\@data);
+  
+  $result.= qq{
+    <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
+    <script type='text/javascript' src='/styles/lte_adm/plugins/jstree/jstree.min.js'></script>
+    <div id=$TREE_ID></div>
+  };
+  $result.= qq(
+    <script>
+      jQuery('#$TREE_ID').jstree({
+    		'core' : {
+          'themes': {
+            'name': 'proton',
+            'responsive': true
+          },
+          'data' : $DATA
+        },
+        'plugins' : [ 'contextmenu', 'types', 'search' ],
+        'search': {
+          'case_insensitive': true,
+          'show_only_matches' : false
+        },
+        'contextmenu' : {
+          'items' : customMenu
+        },
+        'types' : {
+          'table' : {
+                'icon' : 'glyphicon glyphicon-list-alt'
+              },
+          'row' : {
+                'icon' : 'glyphicon glyphicon-option-horizontal'
+              },
+          'scalar' : {
+                'icon' : 'glyphicon glyphicon-file'
+              }
+        }
+    	});
+      function customMenu(node) {
+          var items = {
+              Get: {
+                  label: 'Get',
+                  icon : 'glyphicon glyphicon-download',
+                  action: function () {
+                    renewLeftBox(node.text,'GET',id);
+                  }
+              },
+              Table: { 
+                  label: 'Table',
+                  icon : 'glyphicon glyphicon-list-alt',
+                  action: function () {
+                    renewLeftBox(node.text,'TABLE',id);
+                  }
+              },
+              Walk: { 
+                  label: 'Walk',
+                  icon : 'glyphicon glyphicon-circle-arrow-down',
+                  action: function () {
+                    renewLeftBox(node.text,'WALK',id);
+                  }
+              }
+          };
+
+          if (node.type === 'scalar') {
+            delete items.Table;
+            delete items.Walk;            
+          }
+          else if (node.type === 'row') {
+            delete items.Get;
+            delete items.Table;
+          }
+          else if (node.type === 'table') {
+            delete items.Get;
+          }
+          else {
+            delete items.Table;
+            delete items.Walk;
+            delete items.Get;
+          }
+
+          return items;
+      }
+	  </script>
+   );
+
+  return $result;
 }
 
 1;
