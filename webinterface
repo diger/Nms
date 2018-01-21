@@ -564,8 +564,20 @@ sub nms_snmp_table {
 sub nms_show {
   my ($attr) = @_;
   $snmpparms{UseSprintValue} = 1;
-  my $table = $html->table();
-  $table->addrow($html->b($lang{NAME}), $SNMP::MIB{$attr->{OID}}{label});
+  my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : 'scalar';
+  my $button = $html->button( "$lang{ADD} $type", undef, {
+    JAVASCRIPT     => '',
+    SKIP_HREF      => 1,
+    NO_LINK_FORMER => 1,
+    class          => "btn btn-default",
+    title          => "$lang{ADD} $type",
+    ex_params      => qq/onclick=addLink('$attr->{OID}','$type') /
+  });
+  my $table = $html->table({
+    ID => 'SNMP_SHOW',
+    caption     => $SNMP::MIB{$attr->{OID}}{label},
+    header      => $button
+  });
   $table->addrow($html->b('objectID'), $SNMP::MIB{$attr->{OID}}{objectID});
   $table->addrow($html->b($lang{TYPE}), $SNMP::MIB{$attr->{OID}}{type}) if $SNMP::MIB{$attr->{OID}}{type};
   $table->addrow($html->b('Module'), $SNMP::MIB{$attr->{OID}}{moduleID});
@@ -577,19 +589,7 @@ sub nms_show {
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
-  if ($attr->{EDIT} == 0){
-    my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : 'scalar';
-    my $button = $html->button( $lang{ADD}, undef, {
-      JAVASCRIPT     => '',
-      SKIP_HREF      => 1,
-      NO_LINK_FORMER => 1,
-      class          => "btn btn-default",
-      title          => $lang{ADD},
-      ex_params      => qq/onclick=addLink('$attr->{OID}','$type') /
-    });
-    $table->addrow($button, '');
-  }
-   
+     
   return $table->show();
 }
 #**********************************************************
@@ -612,7 +612,7 @@ sub mibs_browser {
   if ($FORM{OID}){
     $SNMP::save_descriptions = 1;
     $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
-    print nms_show({ OID => $FORM{OID}, EDIT => $ID });
+    print nms_show({ OID => $FORM{OID} });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
       my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
@@ -1235,7 +1235,7 @@ sub oids_set {
   print $html->element('div', $buttons, { class => 'navbar navbar-default' });
   
   if ( ($FORM{add}  || $FORM{ID}) && $type ne 'main') {
-    mibs_browser({EDIT => 1});
+    mibs_browser();
     print qq(
       <script>
         function addLink(oid,type){
