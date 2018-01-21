@@ -589,8 +589,22 @@ sub nms_show {
   $table->addrow($html->b('Reference'), $SNMP::MIB{$attr->{OID}}{reference}) if $SNMP::MIB{$attr->{OID}}{reference};
   $table->addrow($html->b('Index(es)'), "@{$SNMP::MIB{$attr->{OID}}{indexes}}") if $SNMP::MIB{$attr->{OID}}{indexes}[0];
   $table->addrow($html->b('Value List'), oid_enums($attr->{OID},{STR=>1})) if keys %{$SNMP::MIB{$attr->{OID}}{enums}};
-     
-  return $table->show();
+  my $scr = qq(
+    <script>
+      function addLink(oid,type){
+        var link = '?get_index=oids_set&header=2&OBJECTID=$attr->{OBJECTID}';
+        if ( type === 'table'){
+          jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
+            loadRawToModal(link + '&oid_type=' + type + '&chg=' + data);
+          });
+        }
+        else {
+          jQuery.get(link + '&OID=' + oid + '&oid_type=' + type);
+        }
+      };
+    </script>
+    );   
+  return $table->show() . $scr;
 }
 #**********************************************************
 
@@ -612,7 +626,7 @@ sub mibs_browser {
   if ($FORM{OID}){
     $SNMP::save_descriptions = 1;
     $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
-    print nms_show({ OID => $FORM{OID} });
+    print nms_show({ OID => $FORM{OID}, OBJECTID => $FORM{OBJECTID} });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
       my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
@@ -1236,21 +1250,6 @@ sub oids_set {
   
   if ( ($FORM{add}  || $FORM{ID}) && $type ne 'main') {
     mibs_browser();
-    print qq(
-      <script>
-        function addLink(oid,type){
-          var link = '?get_index=oids_set&header=2&OBJECTID=$FORM{OBJECTID}';
-          if ( type === 'table'){
-            jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
-              loadRawToModal(link + '&oid_type=' + type + '&chg=' + data);
-            });
-          }
-          else {
-            jQuery.get(link + '&OID=' + oid + '&oid_type=' + type);
-          }
-        };
-      </script>
-      );
   }
   else{
     $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
