@@ -325,7 +325,7 @@ sub nms_obj_data {
   my @vars;
   foreach my $b (@$info) {
     if ($FORM{UID}){
-      if ( grep{ $_ =~ /ifIndex|PortIndex/ } @{$SNMP::MIB{$b->{label}}{children}[0]{indexes}} ) {
+      if ( grep{ $_ =~ /ifIndex|PortIndex|ProtIndex/ } @{$SNMP::MIB{$b->{label}}{children}[0]{indexes}} ) {
         my $rows = $Nms->oids_rows_list(
           {
             COLS_NAME => 1,
@@ -364,15 +364,27 @@ sub nms_obj_data {
   );
 
   foreach my $val (@$vl) {
-  my $edit = ($SNMP::MIB{$val->[0]}{'access'} && $SNMP::MIB{$val->[0]}{'access'} =~ /ReadWrite|WriteOnly/)?
-    $html->button( $lang{CHANGE}, undef,{
-      JAVASCRIPT     => '',
-      SKIP_HREF      => 1,
-      NO_LINK_FORMER => 1,
-      class          => "change",
-      title          => $lang{ADD},
-      ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&visual=INFO&SET=$val->[0]&VAL=$val->[2]')\"/
-    }) :'';
+    my $edit = '';
+    if ( $SNMP::MIB{$val->[0]}{access} && $SNMP::MIB{$val->[0]}{access} =~ /ReadWrite|WriteOnly/ ){
+      $edit .= $html->button( $lang{CHANGE}, undef,{
+        JAVASCRIPT     => '',
+        SKIP_HREF      => 1,
+        NO_LINK_FORMER => 1,
+        class          => "change",
+        title          => $lang{ADD},
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&SET=$val->[0]&VAL=$val->[2]')\"/
+      });
+		}
+    if ( $SNMP::MIB{$val->[0]}{type} && $SNMP::MIB{$val->[0]}{type} =~ /COUNTER|GAUGE/ ){
+      $edit .= $html->button( $lang{CHANGE}, undef,{
+        JAVASCRIPT     => '',
+        SKIP_HREF      => 1,
+        NO_LINK_FORMER => 1,
+        ICON           =>'glyphicon glyphicon-signal',
+        title          => $lang{ADD},
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&ID=$attr->{ID}&STAT=$val->[0]&IID=$attr->{IID}')\"/
+      });
+		}
   $table->addrow($html->b($val->[0]), $val->[2], $edit);
   }
 

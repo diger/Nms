@@ -122,7 +122,7 @@ my $names = $Nms->obj_list({
   PAGE_ROWS => 1000,
   IP        => '_SHOW',
   NAS_ID    => '_SHOW',
-  LIST2HASH => 'ip,nas_id'
+  LIST2HASH => 'ip,sysname'
 });
 my $mac_notif = $Nms->oids_list({
   LABEL     => '_SHOW',
@@ -217,7 +217,7 @@ sub request_loop {
           $Sender->send_message({
             UID        => 1,
             TO_ADDRESS => 'admin@freenet59.ru',
-            MESSAGE     => "\nIP " . $trap->remoteaddr . " $SNMP::MIB{$eventname}{label} ",
+            MESSAGE     => "\nIP " . $names->{$trap->remoteaddr} . " $SNMP::MIB{$eventname}{label} ",
             %send_attr
           });
         }
