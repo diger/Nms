@@ -1,44 +1,66 @@
-=head1
-  Name: nms_poll
+#!/usr/bin/env perl
+
+=head1 NAME
+
+  Trap sensor
 
 =cut
 
 use strict;
 use warnings;
+no warnings qw(numeric);
+
+BEGIN {
+  use FindBin '$Bin';
+  our $libpath = $Bin . '/../';
+  my $sql_type = 'mysql';
+  unshift(@INC, $libpath . "Abills/$sql_type/", $libpath . '/lib/', $libpath . "Abills/modules/Nms/db");
+}
 
 use Abills::Filters;
-use Abills::Base qw(in_array ip2int);
+use Abills::Base qw(in_array ip2int parse_arguments);
 use POSIX qw(strftime);
-use Nms::db::Nms;
+use Admins;
+use Nms;
 use Data::Dumper;
 use Net::IP;
 use SNMP;
 use Redis;
+require Abills::SQL;
 
-our (
-  $Admin,
-  $db,
-  %conf,
-  $argv,
-  $debug,
-  $var_dir
-);
+our (%conf, $DATE, $TIME, $var_dir, %LIST_PARAMS);
+
+my $debug = 0;
+do $Bin . '/config.pl';
+my $argv = parse_arguments(\@ARGV);
 
 SNMP::addMibDirs( "$var_dir/snmp/mibs" );
 SNMP::addMibDirs( "$var_dir/snmp/mibs/private" );
 SNMP::addMibFiles(glob("$var_dir/snmp/mibs/private" . '/*'));
 SNMP::initMib();
 
+my $sess;
 my %snmpparms;
 $snmpparms{Version} = 2;
 $snmpparms{Retries} = 1;
 $snmpparms{UseSprintValue} = 0;
+
+my $db = Abills::SQL->connect($conf{dbtype}, $conf{dbhost}, $conf{dbname}, $conf{dbuser}, $conf{dbpasswd});
+my $Admin = Admins->new($db, \%conf);
+
 $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 
 my $Redis = Redis->new( server => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
-my $sess;
 my $ctime = time;
+
+if ($argv->{DEBUG}) {
+  $debug = $argv->{DEBUG};
+}
+if ($argv->{help}) {
+  help();
+  exit;
+}
 
 if ($argv->{INIT}) {
   nms_init();
@@ -206,4 +228,14 @@ sub nms_clb {
     print "$obj->{id} fall \n" if $debug > 1;
   }
   return();
+}
+
+#**********************************************************
+=head2 help()
+
+=cut
+#**********************************************************
+sub help {
+  print "Help\n";
+  return 1
 }
