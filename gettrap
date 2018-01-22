@@ -190,7 +190,7 @@ sub request_loop {
             $Sender->send_message({
               UID        => 1,
               TO_ADDRESS => 'admin@freenet59.ru',
-              MESSAGE    => "\nIP " . $trap->remoteaddr ." $Cid_auth->{error}",
+              MESSAGE    => "\nIP $trap->remoteaddr $names->{$trap->remoteaddr}:\n $Cid_auth->{error}",
               %send_attr
             });
           }
@@ -217,7 +217,7 @@ sub request_loop {
           $Sender->send_message({
             UID        => 1,
             TO_ADDRESS => 'admin@freenet59.ru',
-            MESSAGE     => "\nIP " . $names->{$trap->remoteaddr} . " $SNMP::MIB{$eventname}{label} ",
+            MESSAGE     => "\nIP $trap->remoteaddr $names->{$trap->remoteaddr}: \n $SNMP::MIB{$eventname}{label} ",
             %send_attr
           });
         }
