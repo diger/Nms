@@ -316,45 +316,54 @@ sub nms_obj_data {
     {
       COLS_NAME => 1,
       OBJECTID  => $prm->{sysobjectid},
-      TYPE      => 'scalar',
+      TYPE      => ($FORM{UID})? 'table':'scalar',
       LABEL     => '_SHOW',
       IID       => '_SHOW',
     }
   );
-  if ($attr->{OID_ID}){
-    $info = $Nms->oids_rows_list(
-        {
-          COLS_NAME => 1,
-          ID        => $attr->{OID_ID},
-          LABEL     => '_SHOW',
-        }
-      );
-  }
+
   my @vars;
   foreach my $b (@$info) {
-    push @vars, [$b->{label},$b->{iid} || $attr->{IID} || 0]
+    if ($FORM{UID}){
+      if ( grep{ $_ =~ /ifIndex|PortIndex/ } @{$SNMP::MIB{$b->{label}}{children}[0]{indexes}} ) {
+        my $rows = $Nms->oids_rows_list(
+          {
+            COLS_NAME => 1,
+            ID        => $b->{id},
+            LABEL     => '_SHOW',
+          }
+        );
+        foreach my $row (@$rows){
+          if ( grep{ $_ ne $row->{label} } @{$SNMP::MIB{$b->{label}}{children}[0]{indexes}} ) {
+            push @vars, [$row->{label},$attr->{IID}];
+          }
+        }
+      }
+    }
+    else{
+      push @vars, [$b->{label},$b->{iid} || $attr->{IID} || 0]
+    }
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip}, %snmpparms);
 
   my $vl = SNMP::VarList->new(@vars);
-  my @result = $sess->get($vl);
+  $sess->get($vl);
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
 
   my $table = $html->table(
     {
-      #caption     => "$lang{LAST_UPDATE}: $info->[0]->{info_time}",
       width       => '100%',
       title_plain => [ $lang{PARAMS}, $lang{VALUE} ],
       cols_align  => [ 'left', 'left' ],
-      ID          => 'EQUIPMENT_INFO',
+      ID          => 'NMS_INFO',
     }
   );
 
-  foreach my $val (@vars) {
+  foreach my $val (@$vl) {
   my $edit = ($SNMP::MIB{$val->[0]}{'access'} && $SNMP::MIB{$val->[0]}{'access'} =~ /ReadWrite|WriteOnly/)?
     $html->button( $lang{CHANGE}, undef,{
       JAVASCRIPT     => '',
@@ -441,6 +450,7 @@ sub nms_snmp_table {
   my @columns;
   my $tbl;
   my @header_arr;
+  my $rows;
   if (!$attr->{OID}) {
     $tbl = $Nms->oids_list(
       {
@@ -451,10 +461,8 @@ sub nms_snmp_table {
         LABEL     => '_SHOW',
       }
     );
-    my $rows = $Nms->oids_rows_list({ ID => $FORM{TBL_ID} || $tbl->[0]->{id} });
-    foreach my $row (@$rows) {
-      push @columns, $row->[1];
-    }
+    $attr->{OID} = $tbl->[0]->{label};
+    $rows = $Nms->oids_rows_list({ COLS_NAME => 1, ID => $FORM{TBL_ID} || $tbl->[0]->{id} });
     if (@$tbl > 1) {
       foreach my $t (@$tbl) {
         push @header_arr, "$t->{label}:index=$index$pages_qs$visual&TBL_ID=$t->{id}"; 
@@ -462,8 +470,14 @@ sub nms_snmp_table {
     }
   }
   else {
-    foreach my $c (sort { $b <=> $a } @{$SNMP::MIB{$attr->{OID}}{children}[0]{children}}) {
-      push @columns, $c->{'label'};
+    $rows = $SNMP::MIB{$attr->{OID}}{children}[0]{children};
+  }
+  foreach my $row (@$rows) {
+    if ( grep{ $_ eq $row->{'label'} } @{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}} ) {
+      splice @columns, 0, 0, $row->{'label'};
+    }
+    else {
+      push @columns, $row->{'label'};
     }
   }
   
@@ -1482,7 +1496,6 @@ sub nms_client_obj {
       });
       return 1
     }
-    load_mibs({OBJECTID => $nms->[0]->{sysobjectid}});
     my $table = $html->table(
         {
             width       => '100%',
@@ -1507,64 +1520,7 @@ sub nms_client_obj {
             )
     );
     print $table->show();
-
-    my $oids = $Nms->oids_list(
-      {
-        COLS_NAME => 1,
-        OBJECTID  => $nms->[0]->{sysobjectid},
-        TYPE      => 'table',
-        LABEL     => '_SHOW',
-      }
-    );
-
-    my @mibs;
-    foreach my $oid (@$oids){
-      if ( grep{ $_ =~ /ifIndex|PortIndex/ } @{$SNMP::MIB{$oid->{label}}{children}[0]{indexes}} ) {
-        my $rows = $Nms->oids_rows_list(
-          {
-            COLS_NAME => 1,
-            ID        => $oid->{id},
-            LABEL     => '_SHOW',
-          }
-        );
-        foreach my $row (@$rows){
-           push @mibs, [$row->{label},$dhcp->[0]->{ports}];
-        }
-      }
-    }
-    my $vb = SNMP::VarList->new(@mibs);
-    my $sess = SNMP::Session->new(
-      %snmpparms,
-      Community => $conf{NMS_COMMUNITY_RO},
-      DestHost  => $nms->[0]->{ip},
-    );
-    $sess->get($vb);
-    my @res;
-    my $res_table = $html->table(
-        {
-            title_plain => [ $lang{NAME}, 'Value' ],
-            ID          => "PORT_RESULT",
-            HAS_FUNCTION_FIELDS => 1
-        }
-      );
-    foreach my $vl (@$vb){
-      if ($vl->[0] !~ /ifIndex|PortIndex/ ){
-        my $edit = ($SNMP::MIB{$vl->[0]}{access} && $SNMP::MIB{$vl->[0]}{access} =~ /ReadWrite|WriteOnly/)?
-          $html->button( $lang{CHANGE}, undef,{
-            JAVASCRIPT     => '',
-            SKIP_HREF      => 1,
-            NO_LINK_FORMER => 1,
-            class          => "change",
-            title          => $lang{ADD},
-            ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&SET=$vl->[0]&VAL=$vl->[2]')\"/
-          }) :'';
-        $res_table->addrow( $html->b($vl->[0]), $vl->[2], $edit );
-      }
-    }
-    print $res_table->show();
-    
-    #cable_test({ OBJECTID=>$mod->[0]->{sysobjectid} });
-    
+    nms_obj_data({ IID => $dhcp->[0]->{ports}, ID => $nms->[0]->{id} })
   }
   else {
     print $html->message('warning', '', "MAC address is not exists");
