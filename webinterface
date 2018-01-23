@@ -536,7 +536,7 @@ sub nms_snmp_table {
   		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
   			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
   		}
-      if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
+      if ( $results->{$var}->{$ind} && $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
         my $btn = $html->element( 'a', $html->element( 'span', undef, {
           class =>'glyphicon glyphicon-pencil pull-right'
         }), {

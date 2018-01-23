@@ -64,7 +64,7 @@ if ($argv->{help}) {
 
 if ($argv->{INIT}) {
   nms_init();
-  return 1
+  exit;
 }
 
 nms_poll();
@@ -103,7 +103,6 @@ sub nms_init {
                              ['sysUpTime', 0]);
 
   if ($argv->{DISC}) {
-    $Nms->{debug}=1;
     $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
     $snmpparms{Timeout} = 400000;
 	  my $ip = Net::IP->new( $argv->{IPS} || $conf{NMS_NET});
