@@ -15,7 +15,7 @@ require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
 use SNMP;
-use Nms::HTMLelem qw(label_w_txt table_header2 make_tree);
+use Nms::HTMLelem qw(label_w_txt table_header2 make_tree oid_enums);
 
 our ($html,
   %lang,
@@ -201,6 +201,7 @@ sub nms_obj {
 
   if ($FORM{ID} || $FORM{OBJ_ID} || $FORM{IP}) {
     my $obj_id = $FORM{ID} || $FORM{OBJ_ID} || $nms->[0]->{id};
+    return $html->message('err', $lang{ERROR}, 'Device not exists in DB') if !$obj_id;
     $pages_qs .= "&ID=$obj_id";
     my $head_index = "index.cgi?index=$index";
     my @header_arr = [$lang{MAIN},"$head_index&visual=INFO$pages_qs"];
@@ -1095,30 +1096,6 @@ sub load_mibs {
     return $nms->[0] if $attr->{ID};
   }
   return 1;
-}
-
-#**********************************************************
-
-=head2 oid_enums()
-
-=cut
-
-#**********************************************************
-sub oid_enums {
-  my ($oid, $attr) = @_;
-  my %enums;
-  my $str = '';
-  foreach my $el ( keys %{$SNMP::MIB{$oid}{enums}} ) {
-    $enums{$SNMP::MIB{$oid}{enums}{$el}} = $el;
-  }
-  if ($attr){
-    foreach my $key ( sort keys %enums ) {
-      $str .= "$key = $enums{$key} </br>"
-    }
-    return $str;
-  };
-
-  return %enums;
 }
 
 #**********************************************************

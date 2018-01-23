@@ -9,6 +9,7 @@ our @EXPORT = qw(
 label_w_txt
 table_header2
 make_tree
+oid_enums
 );
 #**********************************************************
 =head2 label_w_txt($label,$text,$attr); - return formated text with label
@@ -211,6 +212,30 @@ sub make_tree {
    );
 
   return $result;
+}
+
+#**********************************************************
+
+=head2 oid_enums()
+
+=cut
+
+#**********************************************************
+sub oid_enums {
+  my ($oid, $attr) = @_;
+  my %enums;
+  my $str = '';
+  foreach my $el ( keys %{$SNMP::MIB{$oid}{enums}} ) {
+    $enums{$SNMP::MIB{$oid}{enums}{$el}} = $el;
+  }
+  if ($attr){
+    foreach my $key ( sort keys %enums ) {
+      $str .= "$key = $enums{$key} </br>"
+    }
+    return $str;
+  };
+
+  return %enums;
 }
 
 1;

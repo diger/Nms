@@ -12,7 +12,7 @@ use Abills::Base qw(ip2int mk_unique_value);
 use Dv;
 #use Cid_auth;
 use Dhcphosts;
-use Nms::HTMLelem qw(label_w_txt table_header2);
+use Nms::HTMLelem qw(label_w_txt table_header2 oid_enums);
 
 our(
   %lang,

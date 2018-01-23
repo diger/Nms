@@ -10,6 +10,7 @@ use strict;
 use warnings FATAL => 'all';
 use Abills::Base qw(ip2int mk_unique_value);
 use Nms::db::Traps;
+use Nms::HTMLelem qw(oid_enums);
 
 our(
   %lang,
