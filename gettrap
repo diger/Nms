@@ -118,12 +118,17 @@ my %send_attr = (
 my $bindip = $argv->{IP} || $conf{GETTRAP_IP} || '';
 my $snmptrapd = Net::SNMPTrapd->new(Family => 'ipv4', LocalAddr => $bindip, LocalPort => 162, timeout => 3) 
   or die "Error creating SNMPTrapd listener: ", Net::SNMPTrapd->error;
-my $names = $Nms->obj_list({
+my $nms = $Nms->obj_list({
+  COLS_NAME => 1,
   PAGE_ROWS => 1000,
   IP        => '_SHOW',
   NAS_ID    => '_SHOW',
-  LIST2HASH => 'ip,sysname'
+  SYS_NAME  => '_SHOW',
 });
+my %names;
+foreach my $obj ( @$nms ){
+  $names{$obj->{ip}} = [$obj->{nas_id},$obj->{sysname}]
+}
 my $mac_notif = $Nms->oids_list({
   LABEL     => '_SHOW',
   SECTION   => '_SHOW',
@@ -182,15 +187,15 @@ sub request_loop {
             IP    => $trap->remoteaddr,
             VALUE => $trap->varbinds,
             NOTIF => $syntax
-          },{NAS_ID => $names->{$trap->remoteaddr}, PASS => $conf{NMS_COMMUNITY_RO} });
+          },{NAS_ID => $names{$trap->remoteaddr}[0], PASS => $conf{NMS_COMMUNITY_RO} });
           if ($debug >= 5) {
-            print "Port: $Cid_auth->{PORT} MAC: $Cid_auth->{MAC} NAS: $names->{$trap->remoteaddr} VLAN: $Cid_auth->{PVID} \n";
+            print "Port: $Cid_auth->{PORT} MAC: $Cid_auth->{MAC} NAS: $names{$trap->remoteaddr}[0] VLAN: $Cid_auth->{PVID} \n";
           }
           if ( $Cid_auth->{error} ){
             $Sender->send_message({
               UID        => 1,
               TO_ADDRESS => 'admin@freenet59.ru',
-              MESSAGE    => "\nIP $trap->remoteaddr $names->{$trap->remoteaddr}:\n $Cid_auth->{error}",
+              MESSAGE    => "IP".$trap->remoteaddr." ".$names{$trap->remoteaddr}[1].": $Cid_auth->{error}",
               %send_attr
             });
           }
@@ -204,6 +209,7 @@ sub request_loop {
           TIMETICKS => $trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'}
         });
         splice(@{ $trap->varbinds }, 0, 2);
+        my $ev_msg;
         foreach my $el (@{ $trap->varbinds }) {
           my @oid = keys %$el;
           my @value = values %$el;
@@ -212,12 +218,13 @@ sub request_loop {
             LABEL => $oid[0],
             VALUE => $value[0]
           });
+          $ev_msg .= $SNMP::MIB{$oid[0]}{label} . " $value[0]\n";
         }
         if ( exists $alerts->{$SNMP::MIB{$eventname}{label}} ) {
           $Sender->send_message({
             UID        => 1,
             TO_ADDRESS => 'admin@freenet59.ru',
-            MESSAGE     => "\nIP $trap->remoteaddr $names->{$trap->remoteaddr}: \n $SNMP::MIB{$eventname}{label} ",
+            MESSAGE     => "IP".$trap->remoteaddr." ".$names{$trap->remoteaddr}[1].":\n".$ev_msg,
             %send_attr
           });
         }
