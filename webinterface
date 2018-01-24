@@ -485,26 +485,26 @@ sub nms_snmp_table {
   else {
     $rows = $SNMP::MIB{$attr->{OID}}{children}[0]{children};
   }
+  my %indexes;
+  @indexes{@{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}}} = 0..@{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}};
   foreach my $row (@$rows) {
-    if ( grep{ $_ eq $row->{'label'} } @{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}} ) {
-      splice @columns, 0, 0, $row->{'label'};
-    }
-    else {
-      push @columns, $row->{'label'};
-    }
+      push @columns, $row->{'label'} if !exists $indexes{$row->{'label'}};
   }
-  
   $snmpparms{UseSprintValue} = 1;
+  $snmpparms{Timeout} = 4000000;
   $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
   my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns] );
   if ( $sess->{ErrorNum} ) {
-	return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
+    return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
+  }
+  foreach my $vl ( keys %indexes ) {
+    splice @columns, $indexes{$vl}, 0, $vl;
   }
   my $table = $html->table(
     {
       ID          => $attr->{OID} || $tbl->[0]->{label},
-      caption     => (!$attr->{OID})? $attr->{SECT} : undef,
+      caption     => ($tbl)? $attr->{OID} : undef,
       header      => $html->table_header(\@header_arr),
       title_plain => [@columns],
       DATA_TABLE  => {
@@ -560,7 +560,7 @@ sub nms_snmp_table {
         push @row,  $results->{$var}->{$ind};
       }
   	}
-  	if ( $row[1]) {
+  	if ( $row[0]) {
   		$table->addrow(@row);
   	}
   }
