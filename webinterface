@@ -458,7 +458,7 @@ sub nms_snmp_table {
 
   my ($attr) = @_;
   my $prm = load_mibs({ ID => $attr->{ID}});
-  
+
   my $visual = ($FORM{visual})? "&visual=$FORM{visual}": '';
   my @columns;
   my $tbl;
@@ -1054,7 +1054,7 @@ sub nms_modules {
 }
 
 #**********************************************************
-=head2 load_mibs($attr);
+=head2 load_mibs($attr)
 
 =cut
 #**********************************************************
@@ -1064,10 +1064,9 @@ sub load_mibs {
     SNMP::addMibFiles(glob('../../var/snmp/mibs/private' . '/*'));
   }
   else {
-    my $sys_mods;
     my @mods;
     my $nms;
-    if ($attr->{ID} && $attr->{ID} !~ /.1.3.6/ ){
+    if ($attr->{ID} !~ /.1.3.6.1.4.1/ ){
       $nms = $Nms->obj_list({
         COLS_NAME    => 1,
         ID           => $attr->{ID},
@@ -1075,26 +1074,19 @@ sub load_mibs {
         SYS_OBJECTID => '_SHOW',
         }
       );
-      my $sys_mods = $Nms->modules_list({
-        OBJECTID => $nms->[0]->{sysobjectid},
-        MODULE   => '_SHOW',
-        STATUS   => 1
-      });
     }
-    else {
-      my $sys_mods = $Nms->modules_list({
-        OBJECTID => $attr->{ID},
-        MODULE   => '_SHOW',
-        STATUS   => 1
-      });
-    }
+    my $sys_mods = $Nms->modules_list({
+      OBJECTID => $nms->[0]->{sysobjectid} || $attr->{ID} || $attr->{SYSOBJECTID},
+      MODULE   => '_SHOW',
+      STATUS   => 1
+    });
     foreach my $val (@$sys_mods) {
       push @mods, $val->[0];
     }
     SNMP::loadModules(@mods);
     SNMP::initMib();
   
-    return $nms->[0] if ($attr->{ID} && $attr->{ID} !~ /.1.3.6/ );
+    return $nms->[0] if ($attr->{ID} !~ /.1.3.6.1.4.1/ );
   }
   return 1;
 }
