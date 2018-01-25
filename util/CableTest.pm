@@ -49,7 +49,7 @@ sub cable_test {
     push @{$pair{$test_param->{$key}}}, $key;
   }
 
-  load_mibs({ OBJECTID => $attr->{OBJECTID} });
+  load_mibs({ ID => $attr->{OBJECTID} });
   my %snmpparms;
   $snmpparms{Version} = 2;
   $snmpparms{Retries} = 1;
@@ -178,7 +178,7 @@ sub cable_test_edit {
   }
   
   if ( $FORM{add} ) {
-    load_mibs({ OBJECTID => $FORM{OBJECTID} });
+    load_mibs({ ID => $FORM{OBJECTID} });
     my @labels;
     foreach my $oid (keys(%SNMP::MIB)) {
       if  ( $SNMP::MIB{$oid}{label} =~ /Cable/ || $SNMP::MIB{$oid}{label} =~ /cable/

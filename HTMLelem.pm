@@ -170,21 +170,21 @@ sub make_tree {
                   label: 'Get',
                   icon : 'glyphicon glyphicon-download',
                   action: function () {
-                    renewLeftBox(node.text,'GET',id);
+                    renewLeftBox(node.id,'GET');
                   }
               },
               Table: { 
                   label: 'Table',
                   icon : 'glyphicon glyphicon-list-alt',
                   action: function () {
-                    renewLeftBox(node.text,'TABLE',id);
+                    renewLeftBox(node.id,'TABLE');
                   }
               },
               Walk: { 
                   label: 'Walk',
                   icon : 'glyphicon glyphicon-circle-arrow-down',
                   action: function () {
-                    renewLeftBox(node.text,'WALK',id);
+                    renewLeftBox(node.id,'WALK');
                   }
               }
           };

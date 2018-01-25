@@ -536,14 +536,14 @@ sub nms_snmp_table {
   		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
   			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
   		}
-      if ( $results->{$var}->{$ind} && $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
+      if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
         my $btn = $html->element( 'a', $html->element( 'span', undef, {
           class =>'glyphicon glyphicon-pencil pull-right'
         }), {
           class   => 'col-xs-3',
           title   => $lang{CHANGE},
           onclick => "ChangeVal('$ind','$results->{$var}->{$ind}','$var')",
-        }) . $results->{$var}->{$ind} ;
+        }) . $results->{$var}->{$ind} || '' ;
         push @row, $btn;
   		}
       elsif ( $SNMP::MIB{$ind}{type} && $SNMP::MIB{$ind}{type} =~ /COUNTER|GAUGE/ ){
@@ -553,7 +553,7 @@ sub nms_snmp_table {
           class   => 'col-xs-3',
           title   => $lang{STATS},
           onclick => "ChangeStat('$ind','$var')",
-        }) . $results->{$var}->{$ind} ;
+        }) . $results->{$var}->{$ind} || '' ;
         push @row, $btn;
   		}
       else {
@@ -644,16 +644,15 @@ sub mibs_browser {
 
   my ($attr) = @_;
 
-  my $obj;
   my $root_index = get_function_index('mibs_browser');
   my $mods_index = get_function_index('nms_modules');
   my $ID = $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW} || 0 ;
   $pages_qs = $pages_qs . "&ID=$ID";
+  my $obj = load_mibs({ ID => $ID });
   
   if ($FORM{OID}){
     $SNMP::save_descriptions = 1;
-    $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
-    print nms_show({ OID => $FORM{OID}, OBJECTID => $FORM{OBJECTID} });
+    print nms_show({ OID => $FORM{OID}, OBJECTID => $obj->{sysobjectid} });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
       my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
@@ -692,9 +691,6 @@ sub mibs_browser {
     return 1;
   }
 
-  $obj = load_mibs({ OBJECTID => $FORM{OBJECTID}, ID => $ID });
-  my $OBJECTID = $FORM{OBJECTID} || $obj->{sysobjectid};
-
   my $res = $html->element('div', '',
                 { 
                 id => 'RESULT',
@@ -702,7 +698,7 @@ sub mibs_browser {
                 style => 'overflow-y:scroll;overflow-x:scroll;height:75vh;outline: 1px solid silver'
               });
 
-  my $mod_btn = $html->button($lang{MODULES}, "index=$mods_index&OBJECTID=$OBJECTID", {class =>"btn btn-primary btn-sm"});
+  my $mod_btn = $html->button($lang{MODULES}, "index=$mods_index&OBJECTID=$obj->{sysobjectid}", {class =>"btn btn-primary btn-sm"});
   my $search = $html->element('input', '', { 
     class => 'search-input form-control input-sm',
     placeholder => 'press Enter for search'
@@ -715,15 +711,13 @@ sub mibs_browser {
                 });
   my $scr = qq(
    <script>
-    var id = '$ID';
-
     function renewLeftBox(itemName,Action,id,iid){
-    iid = iid ? iid : 0 ;
-    var url = 'index.cgi?qindex=$root_index&OBJECTID=$OBJECTID&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=' + id;
+      iid = iid ? iid : 0 ;
+      var url = 'index.cgi?qindex=$root_index&header=2&OID=' + itemName + '&IID=' + iid + '&' + Action + '=$ID';
       jQuery('#RESULT').load(url);
     };
     jQuery('#MY_TREE').on("changed.jstree", function (e, data) {
-        renewLeftBox(data.instance.get_node(data.selected[0]).text,'SHOW', id)
+        renewLeftBox(data.instance.get_node(data.selected[0]).id,'SHOW', $ID)
     });
     jQuery(".search-input").keypress(function(e) {
       if (e.which == 13) {
@@ -1060,7 +1054,7 @@ sub nms_modules {
 }
 
 #**********************************************************
-=head2 load_mibs($attr); - return formated text with label
+=head2 load_mibs($attr);
 
 =cut
 #**********************************************************
@@ -1070,8 +1064,10 @@ sub load_mibs {
     SNMP::addMibFiles(glob('../../var/snmp/mibs/private' . '/*'));
   }
   else {
+    my $sys_mods;
+    my @mods;
     my $nms;
-    if ($attr->{ID}){
+    if ($attr->{ID} && $attr->{ID} !~ /.1.3.6/ ){
       $nms = $Nms->obj_list({
         COLS_NAME    => 1,
         ID           => $attr->{ID},
@@ -1079,21 +1075,26 @@ sub load_mibs {
         SYS_OBJECTID => '_SHOW',
         }
       );
+      my $sys_mods = $Nms->modules_list({
+        OBJECTID => $nms->[0]->{sysobjectid},
+        MODULE   => '_SHOW',
+        STATUS   => 1
+      });
     }
-  
-    my @mods;
-    my $sys_mods = $Nms->modules_list({
-      OBJECTID => $attr->{OBJECTID} || $nms->[0]->{sysobjectid},
-      MODULE   => '_SHOW',
-      STATUS   => 1
-    });
+    else {
+      my $sys_mods = $Nms->modules_list({
+        OBJECTID => $attr->{ID},
+        MODULE   => '_SHOW',
+        STATUS   => 1
+      });
+    }
     foreach my $val (@$sys_mods) {
       push @mods, $val->[0];
     }
     SNMP::loadModules(@mods);
     SNMP::initMib();
   
-    return $nms->[0] if $attr->{ID};
+    return $nms->[0] if ($attr->{ID} && $attr->{ID} !~ /.1.3.6/ );
   }
   return 1;
 }
@@ -1216,7 +1217,7 @@ sub nms_monitor {
 sub oids_set {
   my ($attr) = @_;
 
-  load_mibs({ OBJECTID => $FORM{OBJECTID} });
+  load_mibs({ ID => $FORM{OBJECTID} });
   if ( $FORM{del} ) {
     $Nms->oid_del($FORM{del});
   }
