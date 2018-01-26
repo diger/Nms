@@ -485,10 +485,10 @@ sub nms_snmp_table {
   else {
     $rows = $SNMP::MIB{$attr->{OID}}{children}[0]{children};
   }
-  my %indexes;
-  @indexes{@{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}}} = 0..@{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}};
+  my @indexes = @{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}};
+  my %exists = map { $_ => 1 } @indexes;
   foreach my $row (@$rows) {
-      push @columns, $row->{'label'} if !exists $indexes{$row->{'label'}};
+      push @columns, $row->{'label'} if !exists $exists{$row->{'label'}};
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Timeout} = 4000000;
@@ -498,9 +498,7 @@ sub nms_snmp_table {
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
-  foreach my $vl ( keys %indexes ) {
-    splice @columns, $indexes{$vl}, 0, $vl;
-  }
+  splice @columns, 0, 0, @indexes;
   my $table = $html->table(
     {
       ID          => $attr->{OID} || $tbl->[0]->{label},
@@ -537,13 +535,14 @@ sub nms_snmp_table {
   			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
   		}
       if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
+        my $rst = $results->{$var}->{$ind} || '';
         my $btn = $html->element( 'a', $html->element( 'span', undef, {
           class =>'glyphicon glyphicon-pencil pull-right'
         }), {
           class   => 'col-xs-3',
           title   => $lang{CHANGE},
-          onclick => "ChangeVal('$ind','$results->{$var}->{$ind}','$var')",
-        }) . $results->{$var}->{$ind} || '' ;
+          onclick => "ChangeVal('$ind','$rst','$var')",
+        }) . $rst ;
         push @row, $btn;
   		}
       elsif ( $SNMP::MIB{$ind}{type} && $SNMP::MIB{$ind}{type} =~ /COUNTER|GAUGE/ ){
