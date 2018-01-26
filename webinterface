@@ -487,18 +487,24 @@ sub nms_snmp_table {
   }
   my @indexes = @{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}};
   my %exists = map { $_ => 1 } @indexes;
+  my @vars;
   foreach my $row (@$rows) {
-      push @columns, $row->{'label'} if !exists $exists{$row->{'label'}};
+    if ( !exists $exists{$row->{'label'}} ) {
+      push @vars, $row->{'label'};
+      push @columns, $row->{'label'};
+    }
+    else {
+      splice @columns, 0, 0, $row->{'label'};
+    }
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Timeout} = 4000000;
   $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
-  my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns] );
+  my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@vars] );
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
-  splice @columns, 0, 0, @indexes;
   my $table = $html->table(
     {
       ID          => $attr->{OID} || $tbl->[0]->{label},
@@ -531,7 +537,7 @@ sub nms_snmp_table {
           $results->{$var}->{$ind} .= "$offset " if ( $offset > 0 );
         }
   		}
-  		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress'){
+  		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress' && $SNMP::MIB{$ind}{access} eq 'NoAccess' ){
   			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
   		}
       if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
@@ -591,17 +597,18 @@ sub nms_show {
   my ($attr) = @_;
   $snmpparms{UseSprintValue} = 1;
   my $type = ($SNMP::MIB{$attr->{OID}}{children}[0]{indexes}[0])? 'table' : 'scalar';
+  my $label = $SNMP::MIB{$attr->{OID}}{label};
   my $button = $html->button( "$lang{ADD} $type", undef, {
     JAVASCRIPT     => '',
     SKIP_HREF      => 1,
     NO_LINK_FORMER => 1,
     class          => "btn btn-default",
     title          => "$lang{ADD} $type",
-    ex_params      => qq/onclick=addLink('$attr->{OID}','$type') /
+    ex_params      => qq/onclick=addLink('$label','$type') /
   });
   my $table = $html->table({
     ID => 'SNMP_SHOW',
-    caption     => $SNMP::MIB{$attr->{OID}}{label},
+    caption     => $label,
     header      => $button
   });
   $table->addrow($html->b('objectID'), $SNMP::MIB{$attr->{OID}}{objectID});
