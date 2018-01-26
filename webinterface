@@ -373,7 +373,7 @@ sub nms_obj_data {
         NO_LINK_FORMER => 1,
         class          => "change",
         title          => $lang{ADD},
-        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$pages_qs&header=2&SET=$val->[0]&VAL=$val->[2]')\"/
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj&ID=$prm->{id}&header=2&SET=$val->[0]&VAL=$val->[2]')\"/
       });
 		}
     if ( $SNMP::MIB{$val->[0]}{type} && $SNMP::MIB{$val->[0]}{type} =~ /COUNTER|GAUGE/ ){
@@ -487,24 +487,18 @@ sub nms_snmp_table {
   }
   my @indexes = @{$SNMP::MIB{$attr->{OID}}{children}[0]{indexes}};
   my %exists = map { $_ => 1 } @indexes;
-  my @vars;
   foreach my $row (@$rows) {
-    if ( !exists $exists{$row->{'label'}} ) {
-      push @vars, $row->{'label'};
-      push @columns, $row->{'label'};
-    }
-    else {
-      splice @columns, 0, 0, $row->{'label'};
-    }
+      push @columns, $row->{'label'} if !exists $exists{$row->{'label'}};
   }
   $snmpparms{UseSprintValue} = 1;
   $snmpparms{Timeout} = 4000000;
   $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
-  my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@vars] );
+  my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns] );
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
+  splice @columns, 0, 0, @indexes;
   my $table = $html->table(
     {
       ID          => $attr->{OID} || $tbl->[0]->{label},
