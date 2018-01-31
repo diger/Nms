@@ -655,7 +655,7 @@ sub mibs_browser {
   my $obj = load_mibs({ ID => $ID });
   
   if ($FORM{OID}){
-    print nms_show({ OID => $FORM{OID} });
+    print nms_show({ OID => $FORM{OID}, OBJECTID => $ID });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
       my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
@@ -720,7 +720,7 @@ sub mibs_browser {
       jQuery('#RESULT').load(url);
     };
     jQuery('#MY_TREE').on("changed.jstree", function (e, data) {
-        renewLeftBox(data.instance.get_node(data.selected[0]).id,'SHOW', $ID)
+        renewLeftBox(data.instance.get_node(data.selected[0]).id,'SHOW', '$ID')
     });
     jQuery(".search-input").keypress(function(e) {
       if (e.which == 13) {
