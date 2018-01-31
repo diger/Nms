@@ -515,7 +515,7 @@ sub nms_snmp_table {
   foreach my $var (sort { ($a =~ /^\d+$/ &&  $b =~ /^\d+$/) ? $a <=> $b : $a cmp $b } keys %$results) {
 	  my @row = ();
 	  foreach my $ind (@columns){
-      if ( ($SNMP::MIB{$ind}{syntax} eq 'PortList') && $results->{$var}->{$ind} ){
+      if ( ($SNMP::MIB{$ind}{syntax} =~ /PortList/) && $results->{$var}->{$ind} ){
   			$results->{$var}->{$ind} =~ s/"|\n//g;
   			my @in_hex = split(/ /, $results->{$var}->{$ind});
   			my $index='';
@@ -533,6 +533,9 @@ sub nms_snmp_table {
   		}
   		if ( $SNMP::MIB{$ind}{syntax} eq 'MacAddress' && $SNMP::MIB{$ind}{access} eq 'NoAccess' ){
   			$results->{$var}->{$ind} = join(':', unpack("H2H2H2H2H2H2", $results->{$var}->{$ind}));
+  		}
+  		if ( $results->{$var}->{$ind} && $SNMP::MIB{$ind}{syntax} =~ /ManAddress/ && $SNMP::MIB{$ind}{type} eq 'OCTETSTR' ){
+  			$results->{$var}->{$ind} = join('.', unpack("C4", $results->{$var}->{$ind}));
   		}
       if ( $SNMP::MIB{$ind}{access} && $SNMP::MIB{$ind}{access} =~ /ReadWrite|WriteOnly/ ){
         my $rst = $results->{$var}->{$ind} || '';
@@ -648,10 +651,10 @@ sub mibs_browser {
   my $mods_index = get_function_index('nms_modules');
   my $ID = $attr->{ID} || $FORM{ID} || $FORM{GET} || $FORM{WALK} || $FORM{TABLE} || $FORM{SHOW} || 0 ;
   $pages_qs = $pages_qs . "&ID=$ID";
+  $SNMP::save_descriptions = 1 if $FORM{OID};
   my $obj = load_mibs({ ID => $ID });
   
   if ($FORM{OID}){
-    $SNMP::save_descriptions = 1;
     print nms_show({ OID => $FORM{OID}, OBJECTID => $obj->{sysobjectid} });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;

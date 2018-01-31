@@ -10,7 +10,7 @@ use strict;
 use warnings FATAL => 'all';
 use Abills::Base qw(ip2int mk_unique_value);
 use Nms::db::Traps;
-use Nms::HTMLelem qw(oid_enums);
+use Nms::HTMLelem qw(oid_enums oid_conv);
 
 our(
   %lang,
@@ -206,23 +206,4 @@ sub nms_trap_types {
   return 1;
 }
 
-#**********************************************************
-=head2 oid_conv($attr) - conv oid to html link
- STR conv numerical oid to human
-
-=cut
-#**********************************************************
-sub oid_conv{
-  my ($text, $attr) = @_;
-  if (!$attr->{STR}){
-    my $html_str = $html->element('a', $SNMP::MIB{$text}{label}, {
-      title => $text,
-      id    => 'trap',
-      value => $attr->{VALUES}->{ID}
-    });
-    return $html_str;
-  }
-
-  return $SNMP::MIB{$text}{label};
-}
 1;
