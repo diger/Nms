@@ -246,6 +246,7 @@ sub oid_enums {
 #**********************************************************
 sub oid_conv{
   my ($text, $attr) = @_;
+  my $html = Abills::HTML->new();
   if (!$attr->{STR}){
     my $html_str = $html->element('a', $SNMP::MIB{$text}{label}, {
       title => $text,
