@@ -10,6 +10,7 @@ label_w_txt
 table_header2
 make_tree
 oid_enums
+oid_conv
 );
 #**********************************************************
 =head2 label_w_txt($label,$text,$attr); - return formated text with label
