@@ -622,7 +622,7 @@ sub nms_show {
   my $scr = qq(
     <script>
       function addLink(oid,type){
-        var link = '?get_index=oids_set&header=2&OBJECTID=$attr->{OBJECTID}';
+        var link = '?get_index=oids_set&header=2&ID=$attr->{ID}';
         if ( type === 'table'){
           jQuery.get(link + '&OID=' + oid + '&oid_type=' + type, function(data){
             loadRawToModal(link + '&oid_type=' + type + '&chg=' + data);
@@ -655,7 +655,7 @@ sub mibs_browser {
   my $obj = load_mibs({ ID => $ID });
   
   if ($FORM{OID}){
-    print nms_show({ OID => $FORM{OID}, OBJECTID => $ID });
+    print nms_show({ OID => $FORM{OID}, ID => $ID });
     if ($FORM{GET}){
       $snmpparms{UseSprintValue} = 1;
       my $sess = SNMP::Session->new(DestHost => $obj->{ip}, %snmpparms);
@@ -1069,6 +1069,7 @@ sub load_mibs {
   else {
     my @mods;
     my $nms;
+    my $obj;
     if ($attr->{ID} !~ /.1.3.6.1.4.1/ ){
       $nms = $Nms->obj_list({
         COLS_NAME    => 1,
@@ -1077,9 +1078,13 @@ sub load_mibs {
         SYS_OBJECTID => '_SHOW',
         }
       );
+      $obj = $nms->[0];
+    }
+    else {
+      $obj = ({sysobjectid => $attr->{ID} || $attr->{SYSOBJECTID}})
     }
     my $sys_mods = $Nms->modules_list({
-      OBJECTID => $nms->[0]->{sysobjectid} || $attr->{ID} || $attr->{SYSOBJECTID},
+      OBJECTID => $obj->{sysobjectid},
       MODULE   => '_SHOW',
       STATUS   => 1
     });
@@ -1089,9 +1094,9 @@ sub load_mibs {
     SNMP::loadModules(@mods);
     SNMP::initMib();
   
-    return $nms->[0] if ($attr->{ID} !~ /.1.3.6.1.4.1/ );
+    return $obj;
   }
-  return 1;
+  return 1 ;
 }
 
 #**********************************************************
@@ -1212,14 +1217,15 @@ sub nms_monitor {
 sub oids_set {
   my ($attr) = @_;
 
-  load_mibs({ ID => $FORM{OBJECTID} });
+  my $prm = load_mibs({ ID => $FORM{ID} || $FORM{OBJECTID} });
   if ( $FORM{del} ) {
     $Nms->oid_del($FORM{del});
   }
   my $type = $FORM{oid_type} || 'main';
+  my $obj_id = $prm->{sysobjectid};
   
   if ( $FORM{chg} && $type ne 'main') {
-    return oid_table_row_edit({ OID_ID => $FORM{chg}, OBJECTID => $FORM{OBJECTID} });
+    return oid_table_row_edit({ OID_ID => $FORM{chg}, OBJECTID => $obj_id });
   }
 
   if ($FORM{OID} ) {
@@ -1229,7 +1235,7 @@ sub oids_set {
       LABEL    => $FORM{OID},
       SECTION  => $sect,
       TYPE     => $FORM{oid_type} || '',
-      OBJECTID => $FORM{OBJECTID},
+      OBJECTID => $obj_id,
       VALUE    => $FORM{VALUE},
     });
     if (!$FORM{TYPE}){
@@ -1239,19 +1245,19 @@ sub oids_set {
   }
 
   my @header_arr = (
-    "$lang{MAIN}:index=$index&oid_type=main&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "TABLE:index=$index&oid_type=table&OBJECTID=$FORM{OBJECTID}$pages_qs",
-    "SCALAR:index=$index&oid_type=scalar&OBJECTID=$FORM{OBJECTID}$pages_qs"
+    "$lang{MAIN}:index=$index&oid_type=main&ID=$obj_id$pages_qs",
+    "TABLE:index=$index&oid_type=table&ID=$obj_id$pages_qs",
+    "SCALAR:index=$index&oid_type=scalar&ID=$obj_id$pages_qs"
   );
 
   my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
   print $html->element('div', $buttons, { class => 'navbar navbar-default' });
   
-  if ( ($FORM{add}  || $FORM{ID}) && $type ne 'main') {
+  if ( $FORM{add} && $type ne 'main') {
     mibs_browser();
   }
   else{
-    $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+    $LIST_PARAMS{OBJECTID} = $obj_id;
     $LIST_PARAMS{TYPE} = $type;
     $LIST_PARAMS{ID} = $FORM{chg} || '_SHOW';
     my ($table,$list) = result_former({
@@ -1265,10 +1271,10 @@ sub oids_set {
        },
       SKIP_USER_TITLE => 1,
       TABLE           => {
-       qs      => "$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type",
+       qs      => "$pages_qs&OBJECTID=$obj_id&oid_type=$type",
        ID      => 'OID_LIST',
-       caption => $SNMP::MIB{$FORM{OBJECTID}}{label},
-       MENU => "$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=$type&add=1:add",
+       caption => $SNMP::MIB{$obj_id}{label},
+       MENU => "$lang{ADD}:index=$index$pages_qs&ID=$obj_id&oid_type=$type&add=1:add",
       },
       MAKE_ROWS => 1,
       TOTAL     => 1,
@@ -1302,7 +1308,7 @@ sub oids_set {
       	HIDDEN  => {
           'index'    => $index,
           'oid_type' => 'main',
-          'OBJECTID' => $FORM{OBJECTID},
+          'ID' => $obj_id,
           'OID_ID' => $FORM{chg}
        },
         class => 'form-horizontal'
