@@ -702,7 +702,7 @@ sub mibs_browser {
                 style => 'overflow-y:scroll;overflow-x:scroll;height:75vh;outline: 1px solid silver'
               });
 
-  my $mod_btn = $html->button($lang{MODULES}, "index=$mods_index&OBJECTID=$ID", {class =>"btn btn-primary btn-sm"});
+  my $mod_btn = $html->button($lang{MODULES}, "index=$mods_index&OBJECTID=$obj->{sysobjectid}", {class =>"btn btn-primary btn-sm"});
   my $search = $html->element('input', '', { 
     class => 'search-input form-control input-sm',
     placeholder => 'press Enter for search'
