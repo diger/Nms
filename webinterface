@@ -495,6 +495,7 @@ sub nms_snmp_table {
   $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
   my $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns] );
+  $results = $sess->gettable( $attr->{OID} || $tbl->[0]->{label}, columns => [@columns], nogetbulk => 1 ) if !$results;
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
@@ -555,7 +556,7 @@ sub nms_snmp_table {
           class   => 'col-xs-3',
           title   => $lang{STATS},
           onclick => "ChangeStat('$ind','$var')",
-        }) . $results->{$var}->{$ind} || '' ;
+        }) . ($results->{$var}->{$ind} || 0) ;
         push @row, $btn;
   		}
       else {
