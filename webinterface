@@ -313,6 +313,14 @@ sub nms_obj_data {
   my ($attr) = @_;
 
   my $prm = load_mibs({ ID => $attr->{ID}});
+  if ( $FORM{LABEL} && $FORM{VALUE} ) {
+    nms_snmp_set({
+          ID    => $FORM{ID},
+          LABEL => $FORM{LABEL},
+          IID   => $FORM{IID},
+          VALUE => $FORM{VALUE}
+        })
+  }
   my $info = $Nms->oids_list(
     {
       COLS_NAME => 1,
@@ -324,6 +332,7 @@ sub nms_obj_data {
   );
 
   my @vars;
+  my $uid = ($FORM{UID})? "&UID=$FORM{UID}" : '';
   foreach my $b (@$info) {
     if ($FORM{UID}){
       if ( grep{ $_ =~ /ifIndex|PortIndex|ProtIndex/ } @{$SNMP::MIB{$b->{label}}{children}[0]{indexes}} ) {
@@ -373,7 +382,7 @@ sub nms_obj_data {
         NO_LINK_FORMER => 1,
         class          => "change",
         title          => $lang{ADD},
-        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj&ID=$prm->{id}&header=2&SET=$val->[0]&VAL=$val->[2]')\"/
+        ex_params      => qq/onclick=\"loadRawToModal('?get_index=nms_obj$uid&ID=$prm->{id}&header=2&SET=$val->[0]&IID=$val->[1]&VAL=$val->[2]')\"/
       });
 		}
     if ( $SNMP::MIB{$val->[0]}{type} && $SNMP::MIB{$val->[0]}{type} =~ /COUNTER|GAUGE/ ){
@@ -408,7 +417,15 @@ sub nms_snmp_set {
   if ($FORM{IN_MODAL}){
     my %enums = oid_enums($attr->{LABEL});
     my %vals = reverse %enums;
-    my $obj_index = get_function_index('nms_obj');
+    my %obj_index;
+    if ($FORM{visual}){
+       $obj_index{index} =  get_function_index('nms_obj');
+       $obj_index{visual} = $FORM{visual};
+    }
+    else {
+      $obj_index{index} =  get_function_index('nms_client_obj');
+      $obj_index{UID} = $FORM{UID};
+    }
     print $html->form_main({
       CONTENT =>
         (($FORM{IID})? label_w_txt('IID',$attr->{IID}) : '').
@@ -427,8 +444,7 @@ sub nms_snmp_set {
               class => 'btn btn-default' }), {RCOL => 8}),
 	    METHOD  => 'GET',
     	HIDDEN  => {
-        'index'  => $obj_index,
-        'visual' => $FORM{visual},
+        %obj_index,
         'ID'     => $attr->{ID},
         'LABEL'  => $attr->{LABEL},
         'IID'    => $attr->{IID}
