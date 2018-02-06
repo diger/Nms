@@ -2,7 +2,7 @@ package Traps;
 
 =head1 NAME
 
-  Equipment managment system
+  SNMP Traps for Nms
 
 =cut
 
@@ -117,7 +117,7 @@ sub trap_del {
 }
 
 #**********************************************************
-=head2 traps_list($attr)
+=head2 trap_values($attr)
 
 =cut
 #**********************************************************
@@ -137,7 +137,7 @@ sub trap_values {
 }
 
 #**********************************************************
-# trap_add()
+# trap_values_add()
 #**********************************************************
 sub trap_values_add {
   my $self = shift;
@@ -149,7 +149,7 @@ sub trap_values_add {
 }
 
 #**********************************************************
-=head2 traps_del($attr)
+=head2 nms_traps_del($attr)
 
 =cut
 #**********************************************************

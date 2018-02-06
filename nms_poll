@@ -230,6 +230,54 @@ sub nms_clb {
 }
 
 #**********************************************************
+=head2 nms_poll($attr)
+
+=cut
+#********************************************************** 
+sub nms_lldp {
+  my $obj_list = $Nms->obj_list( {
+    COLS_NAME    => 1,
+    PAGE_ROWS    => 100000,
+    IP           => '_SHOW',
+    SYS_OBJECTID => '_SHOW',
+    STATUS       => '_SHOW',
+  } );
+
+  foreach my $obj (@$obj_list) {
+    my @mibs;
+    push @mibs, ['sysObjectID', 0];
+ #   push @mibs, ['sysName', 0];
+#    push @mibs, ['sysLocation', 0];
+    my $triggers;
+    if ($argv->{STATS}){
+      $triggers = $Nms->triggers_list({
+        COLS_NAME => 1,
+        OBJ_ID    => $obj->{id},
+        LABEL     => '_SHOW',
+        IID       => '_SHOW',
+      });
+      if ($triggers){
+        foreach my $vr (@$triggers){
+          push @mibs, [$vr->{label},$vr->{iid}];
+        }
+      }
+    }
+    
+    my $vb = SNMP::VarList->new(@mibs);
+    $sess = SNMP::Session->new(
+      %snmpparms,
+      Community => $conf{NMS_COMMUNITY_RO},
+      DestHost  => $obj->{ip},
+  #    Timeout  => -1,
+    );
+    $sess->get($vb, [ \&nms_clb, $obj, $triggers ]);
+
+    &SNMP::MainLoop(2);
+  }
+  return 1;
+}
+
+#**********************************************************
 =head2 help()
 
 =cut

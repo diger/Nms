@@ -148,12 +148,12 @@ sub nms_obj {
       ADD_TR => $FORM{ADD_TR}
     })
   }
-  if ( $FORM{LABEL} && $FORM{VALUE} ) {
+  if ( $FORM{LABEL} && $FORM{SET} ) {
     nms_snmp_set({
           ID    => $FORM{ID},
           LABEL => $FORM{LABEL},
           IID   => $FORM{IID},
-          VALUE => $FORM{VALUE}
+          VALUE => $FORM{VALUE} || 0
         })
   }
   my $nms = $Nms->obj_list({
@@ -418,13 +418,13 @@ sub nms_snmp_set {
     my %enums = oid_enums($attr->{LABEL});
     my %vals = reverse %enums;
     my %obj_index;
-    if ($FORM{visual}){
-       $obj_index{index} =  get_function_index('nms_obj');
-       $obj_index{visual} = $FORM{visual};
-    }
-    else {
+    if ($FORM{UID}) {
       $obj_index{index} =  get_function_index('nms_client_obj');
       $obj_index{UID} = $FORM{UID};
+    }
+    else {
+       $obj_index{index} =  get_function_index('nms_obj');
+       $obj_index{visual} = $FORM{visual} || 'INFO';
     }
     print $html->form_main({
       CONTENT =>
@@ -461,7 +461,7 @@ sub nms_snmp_set {
     return $html->message('err', $lang{ERROR}, $sess->{ErrorStr});
   }
 
-  return 1;
+  return $html->message('success', "$lang{SUCCESS}");
 }
 
 #**********************************************************
