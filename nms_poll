@@ -67,6 +67,12 @@ if ($argv->{INIT}) {
   exit;
 }
 
+if ($argv->{LLDP}) {
+  print "!!!!";
+  nms_lldp();
+  exit;
+}
+
 nms_poll();
 #**********************************************************
 =head2 nms_init($attr)
@@ -230,19 +236,19 @@ sub nms_clb {
 }
 
 #**********************************************************
-=head2 nms_poll($attr)
+=head2 nms_lldp($attr)
 
 =cut
 #********************************************************** 
 sub nms_lldp {
   my $obj_list = $Nms->obj_list( {
-    COLS_NAME    => 1,
-    PAGE_ROWS    => 100000,
-    IP           => '_SHOW',
-    SYS_OBJECTID => '_SHOW',
-    STATUS       => '_SHOW',
+    PAGE_ROWS  => 100000,
+    IP         => '_SHOW',
+    STATUS     => 0,
+    LIST2HASH  => 'ip, id'
   } );
-
+  print Dumper $obj_list;
+=comm
   foreach my $obj (@$obj_list) {
     my @mibs;
     push @mibs, ['sysObjectID', 0];
@@ -274,6 +280,7 @@ sub nms_lldp {
 
     &SNMP::MainLoop(2);
   }
+=cut
   return 1;
 }
 
