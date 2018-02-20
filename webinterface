@@ -40,6 +40,7 @@ $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
 
 require Nms::util::CableTest;
 require Nms::util::NmsTraps;
+require Nms::util::NmsLldp;
 
 #**********************************************************
 
@@ -506,7 +507,7 @@ sub nms_snmp_table {
   foreach my $row (@$rows) {
       push @columns, $row->{'label'} if !exists $exists{$row->{'label'}};
   }
-  $snmpparms{UseSprintValue} = 1;
+  $snmpparms{UseSprintValue} = ($attr->{HASH})? 0:1;
   $snmpparms{Timeout} = 4000000;
   $snmpparms{Community} = $prm->{COMMUNITY} || $conf{NMS_COMMUNITY_RO};
   my $sess = SNMP::Session->new(DestHost => $prm->{ip},%snmpparms);
@@ -515,6 +516,7 @@ sub nms_snmp_table {
   if ( $sess->{ErrorNum} ) {
     return $html->message('err', $lang{ERROR}, $sess->{ErrStr});
   }
+  return $results if $attr->{HASH};
   splice @columns, 0, 0, @indexes;
   my $table = $html->table(
     {
@@ -1165,7 +1167,64 @@ sub mibs_tree {
     }
   }
   return \%labels if $attr->{LABEL} || $attr->{HASH} || $attr->{SYNTAX};
-  return make_tree( @tree_arr );
+  print qq(
+    <script>
+      function customMenu(node) {
+          var items = {
+              Get: {
+                  label: 'Get',
+                  icon : 'glyphicon glyphicon-download',
+                  action: function () {
+                    renewLeftBox(node.id,'GET');
+                  }
+              },
+              Table: { 
+                  label: 'Table',
+                  icon : 'glyphicon glyphicon-list-alt',
+                  action: function () {
+                    renewLeftBox(node.id,'TABLE');
+                  }
+              },
+              Walk: { 
+                  label: 'Walk',
+                  icon : 'glyphicon glyphicon-circle-arrow-down',
+                  action: function () {
+                    renewLeftBox(node.id,'WALK');
+                  }
+              }
+          };
+
+          if (node.type === 'scalar') {
+            delete items.Table;
+            delete items.Walk;            
+          }
+          else if (node.type === 'row') {
+            delete items.Get;
+            delete items.Table;
+          }
+          else if (node.type === 'table') {
+            delete items.Get;
+          }
+          else {
+            delete items.Table;
+            delete items.Walk;
+            delete items.Get;
+          }
+
+          return items;
+      }
+	  </script>
+   );
+  my %types = (
+   table  => { icon => 'glyphicon glyphicon-list-alt' },
+   row    => { icon => 'glyphicon glyphicon-option-horizontal' },
+   scalar => { icon => 'glyphicon glyphicon-file' }
+  );
+  return make_tree({
+    plugins => ['types', 'search', 'contextmenu'],
+    contextmenu => 'customMenu',
+    types => \%types,
+    data => \@tree_arr });
 }
 
 #**********************************************************

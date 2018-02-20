@@ -11,6 +11,7 @@ table_header2
 make_tree
 oid_enums
 oid_conv
+flowchart
 );
 #**********************************************************
 =head2 label_w_txt($label,$text,$attr); - return formated text with label
@@ -125,10 +126,23 @@ sub table_header2 {
 =cut
 #**********************************************************
 sub make_tree {
-  my (@data) = @_;
+  my ($attr) = @_;
   my $result = '';
   my $TREE_ID = 'MY_TREE';
-  my $DATA  = JSON->new->encode(\@data);
+  my %all;
+  
+  $all{core}{themes} = ({ name => 'proton', responsive => 'true' });
+  $all{core}{data} = $attr->{data};
+  $all{plugins} = ($attr->{plugins})? $attr->{plugins}:'search';
+  $all{search} = ($attr->{search})? $attr->{search}:({ case_insensitive => 'true', show_only_matches => 'false' });
+  $all{contextmenu} = ({ items => $attr->{contextmenu} }) if $attr->{contextmenu};
+  $all{types} = $attr->{types} if $attr->{types};
+#  print JSON->new->encode(\%all);
+  my $DATA  = JSON->new->indent->encode(\%all);
+  $DATA =~ s/"$attr->{contextmenu}"/$attr->{contextmenu}/;
+  $DATA =~ s/"false"/false/g;
+  $DATA =~ s/"true"/true/g;
+  $DATA =~ s/"/'/g;
   
   $result.= qq{
     <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
@@ -137,78 +151,7 @@ sub make_tree {
   };
   $result.= qq(
     <script>
-      jQuery('#$TREE_ID').jstree({
-    		'core' : {
-          'themes': {
-            'name': 'proton',
-            'responsive': true
-          },
-          'data' : $DATA
-        },
-        'plugins' : [ 'contextmenu', 'types', 'search' ],
-        'search': {
-          'case_insensitive': true,
-          'show_only_matches' : false
-        },
-        'contextmenu' : {
-          'items' : customMenu
-        },
-        'types' : {
-          'table' : {
-                'icon' : 'glyphicon glyphicon-list-alt'
-              },
-          'row' : {
-                'icon' : 'glyphicon glyphicon-option-horizontal'
-              },
-          'scalar' : {
-                'icon' : 'glyphicon glyphicon-file'
-              }
-        }
-    	});
-      function customMenu(node) {
-          var items = {
-              Get: {
-                  label: 'Get',
-                  icon : 'glyphicon glyphicon-download',
-                  action: function () {
-                    renewLeftBox(node.id,'GET');
-                  }
-              },
-              Table: { 
-                  label: 'Table',
-                  icon : 'glyphicon glyphicon-list-alt',
-                  action: function () {
-                    renewLeftBox(node.id,'TABLE');
-                  }
-              },
-              Walk: { 
-                  label: 'Walk',
-                  icon : 'glyphicon glyphicon-circle-arrow-down',
-                  action: function () {
-                    renewLeftBox(node.id,'WALK');
-                  }
-              }
-          };
-
-          if (node.type === 'scalar') {
-            delete items.Table;
-            delete items.Walk;            
-          }
-          else if (node.type === 'row') {
-            delete items.Get;
-            delete items.Table;
-          }
-          else if (node.type === 'table') {
-            delete items.Get;
-          }
-          else {
-            delete items.Table;
-            delete items.Walk;
-            delete items.Get;
-          }
-
-          return items;
-      }
+      jQuery('#$TREE_ID').jstree($DATA);
 	  </script>
    );
 
@@ -258,6 +201,33 @@ sub oid_conv{
   }
 
   return $SNMP::MIB{$text}{label};
+}
+
+#**********************************************************
+=head2 flowchart($attr) - Make flowchart
+
+=cut
+#**********************************************************
+sub flowchart {
+  my ($oprs,$links,$attr) = @_;
+  my $html = Abills::HTML->new();
+  my %all;
+  $all{data}{operators} = $oprs;
+  $all{data}{links} = $links;
+  $all{linkWidth} = 5 if !$attr->{linkWidth};
+  %all = (%all,%$attr);
+  my $DATA  = JSON->new->indent->encode(\%all);
+  $DATA =~ s/"false"/false/g;
+  $DATA =~ s/"true"/true/g;
+  my $scr = qq(
+  <link rel='stylesheet' href='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.css' />
+  <script type='text/javascript' src='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.js'></script>
+  <div id='flow' style='position:unset;overflow:unset'>
+  <script type="text/javascript">
+      jQuery('#flow').flowchart($DATA);
+  </script>
+  );
+  return $scr;
 }
 
 1;
