@@ -139,7 +139,7 @@ sub neighbors_view {
     });
   </script>);
 
-  print $tree.$res. $scr;
+  print $html->element('div', $tree.$res, {class=>'row'}) . $scr;
   
   return 1
 }
