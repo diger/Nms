@@ -222,7 +222,7 @@ sub flowchart {
   my $scr = qq(
   <link rel='stylesheet' href='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.css' />
   <script type='text/javascript' src='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.js'></script>
-  <div id='flow' style='position:unset;overflow:unset'>
+  <div id='flow' style='position:unset;'>
   <script type="text/javascript">
       jQuery('#flow').flowchart($DATA);
   </script>
