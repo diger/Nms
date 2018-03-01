@@ -249,29 +249,44 @@ sub nms_lldp {
     LIST2HASH  => 'ip, id'
   } );
   $snmpparms{UseSprintValue} = 0;
+  my %tree;
+  my @arr =  ($conf{NMS_LLDP_ROOT});
 
-  foreach my $ip (keys %$obj_list) {
-    $sess = SNMP::Session->new( %snmpparms, Community => $conf{NMS_COMMUNITY_RO}, DestHost  => $ip );
+  my @vbs = (SNMP::Varbind->new(['lldpRemManAddrOID']),SNMP::Varbind->new(['swMSTPMstPortRole']));
+  my $vl = SNMP::VarList->new(@vbs);
+  $snmpparms{UseSprintValue} = 0;
+  $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
 
-    if ( !$sess->{ErrorNum} ) {
-      my $rem_addrs = $sess->gettable('lldpRemManAddrTable');
-      print "IP $ip \n" . Dumper $rem_addrs if $debug > 2;
-      while (my($key,$value) = each %$rem_addrs) {
-        if ($value->{lldpRemIndex}){
-          my $raddr = join('.', unpack("C4", $value->{lldpRemManAddr}));
-          if ($obj_list->{$raddr}) {
+  while ( @arr > 0 ){
+    my $ip = shift(@arr);
+    $tree{$ip} = 1;
+    my $sess = SNMP::Session->new(DestHost => $ip, %snmpparms );
+    my ($res,$stp) = $sess->bulkwalk(0, 1, $vl);
+
+    foreach my $port ( @$stp ){
+      if ($port->[2] == 1){
+        $stp = 0;
+        last
+      }
+    }
+    
+    if ($stp != 0){
+      foreach my $var ( @$res ){
+        if ( $var->[2] ne '.0.0' ){
+          $var->[1] =~ /\d+\.(\d+)\.\d+\.\d+\.\d+\.(\d+\.\d+\.\d+\.\d+)/gi;
+          if ( !exists($tree{$2}) ){
+            unshift @arr, $2;
             $Lldp->neighbor_add({
-              OBJ_ID   => $obj_list->{$ip},
-              NGR_ID   => $obj_list->{$raddr},
-              LOC_PORT => $value->{lldpRemLocalPortNum},
-              TIMEMARK => $value->{lldpRemTimeMark}
+              OBJ_ID   => $obj_list->{$2},
+              NGR_ID   => $obj_list->{$ip},
+              LOC_PORT => $1,
             }) if $debug < 2;
           }
         }
       }
     }
   }
-
+  
   return 1;
 }
 

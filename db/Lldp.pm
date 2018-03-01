@@ -51,11 +51,10 @@ sub neighbors_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : '';
 
   my $WHERE =  $self->search_former($attr, [
-    ['ID',        'INT',  'l.id',        1 ],
+    ['ID',        'INT',  'id',        1 ],
     ['OBJ_ID',    'INT',  'obj_id',      1 ],
     ['NGR_ID',    'INT',  'neighbor_id', 1 ],
     ['LOC_PORT',  'INT',  'loc_port',    1 ],
-    ['SYS_NAME',  'STR',  'sysname',     1 ],
     ['TYPE',      'STR',  'type',        1 ],
 	  ['TIMEMARK',  'INT',  'timemark',    1 ],
     ],
@@ -63,9 +62,8 @@ sub neighbors_list {
     }
   );
 
-  $self->query2("SELECT $self->{SEARCH_FIELDS} l.id as id
-    FROM nms_obj_lldp l
-    LEFT JOIN nms_obj n ON (n.id=obj_id)
+  $self->query2("SELECT $self->{SEARCH_FIELDS} id
+    FROM nms_obj_lldp
     $WHERE
     ORDER BY $SORT $DESC;",
     undef,
