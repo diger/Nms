@@ -117,9 +117,12 @@ sub neighbor_add {
 #**********************************************************
 sub neighbor_del {
   my $self = shift;
-  my ($id) = @_;
+  my ($attr) = @_;
 
-  $self->query_del('nms_obj_lldp', { ID => $id });
+  $self->query_del('nms_obj_lldp', $attr, {
+    obj_id      => $attr->{OBJ_ID},
+    neighbor_id => $attr->{NGR_ID}
+  });
 
   return $self;
 }

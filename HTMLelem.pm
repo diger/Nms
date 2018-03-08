@@ -219,6 +219,7 @@ sub flowchart {
   my $DATA  = JSON->new->indent->encode(\%all);
   $DATA =~ s/"false"/false/g;
   $DATA =~ s/"true"/true/g;
+  $DATA =~ s/\"\*|\*\"/ /g;
   my $scr = qq(
   <link rel='stylesheet' href='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.css' />
   <script type='text/javascript' src='/styles/lte_adm/plugins/flowchart/jquery.flowchart.min.js'></script>

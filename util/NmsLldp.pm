@@ -37,6 +37,7 @@ sub neighbors_view {
   my ($attr) = @_;
 
   if ($FORM{ID}){
+    my $nms_index = get_function_index( 'nms_obj' );
     my $nms = $Nms->obj_list({
       IP           => '_SHOW',
       SYS_NAME     => '_SHOW',
@@ -61,7 +62,7 @@ sub neighbors_view {
     my $left = 300;
     my $in = 0;
     foreach my $key ( keys %$matbl ) {
-      $inputs{$matbl->{$key}->{lldpRemLocalPortNum}} = ({ label => "Port $matbl->{$key}->{lldpRemLocalPortNum}" });
+      $inputs{$matbl->{$key}->{lldpRemLocalPortNum}} = ({ label => "$lang{PORT} $matbl->{$key}->{lldpRemLocalPortNum}" });
     }
     foreach my $key ( sort { $a <=> $b } keys %inputs ) {
       $in++;
@@ -72,13 +73,13 @@ sub neighbors_view {
           title => $remp{$key}[0],
           inputs => {
             $remp{$key}[1] => {
-              label => "Port $remp{$key}[1]"
+              label => "$lang{PORT} $remp{$key}[1]"
             }
           }
         }
       });
       $links{$key} = ({
-        fromOperator  => $nms->[0]->{sysname},
+        fromOperator  => $nms->[0]->{id},
         fromConnector => $key,
         toOperator    => $remp{$key}[0],
         toConnector   => $remp{$key}[1],
@@ -87,7 +88,7 @@ sub neighbors_view {
       $top = 0 if ( $in == 8 );
       $top = $top + 80;
     }
-    $bd{$nms->[0]->{sysname}} = ({
+    $bd{$nms->[0]->{id}} = ({
       top => 20,
       left => 10,
       properties => {
@@ -97,8 +98,11 @@ sub neighbors_view {
     });
     print flowchart(\%bd, \%links, {
       canUserEditLinks     => 'false',
-      canUserMoveOperators => 'false'
+      canUserMoveOperators => 'false',
+      distanceFromArrow => 20,
+      onOperatorSelect => "*function (operatorId) {window.location.href = '?index=$nms_index&ID=' + operatorId;return true;}*"
     });
+
     return 1
   }
   

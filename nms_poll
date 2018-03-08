@@ -259,32 +259,39 @@ sub nms_lldp {
 
   while ( @arr > 0 ){
     my $ip = shift(@arr);
-    $tree{$ip} = 1;
+    last if !$ip;
+
     my $sess = SNMP::Session->new(DestHost => $ip, %snmpparms );
     my ($res,$stp) = $sess->bulkwalk(0, 1, $vl);
 
-    foreach my $port ( @$stp ){
-      if ($port->[2] == 1){
-        $stp = 0;
-        last
-      }
-    }
-    
-    if ($stp != 0){
-      foreach my $var ( @$res ){
-        if ( $var->[2] ne '.0.0' ){
-          $var->[1] =~ /\d+\.(\d+)\.\d+\.\d+\.\d+\.(\d+\.\d+\.\d+\.\d+)/gi;
-          if ( !exists($tree{$2}) ){
-            unshift @arr, $2;
-            $Lldp->neighbor_add({
-              OBJ_ID   => $obj_list->{$2},
-              NGR_ID   => $obj_list->{$ip},
-              LOC_PORT => $1,
-            }) if $debug < 2;
-          }
+    if ($stp->[0]){
+      foreach my $port ( @$stp ){
+        if ($port->[2] == 1 && !exists($tree{$ip})){
+          $tree{$ip} = $port->[1]*1;
         }
       }
     }
+    $tree{$ip} = 0 if !exists($tree{$ip});
+
+    foreach my $var ( @$res ){
+      if ( $var->[2] ne '.0.0' && $var->[1] =~ /\d+\.(\d+)\.\d+\.\d+\.\d+\.(\d+\.\d+\.\d+\.\d+)/ ){
+        if ( (!exists($tree{$2}) || $tree{$2} == 2 ) && $tree{$ip} == 0 ){
+          unshift @arr, $2;
+          $Lldp->neighbor_add({
+            OBJ_ID   => $obj_list->{$2},
+            NGR_ID   => $obj_list->{$ip},
+            LOC_PORT => $1,
+          }) if $debug < 2;
+        }
+        elsif ( $tree{$ip} == $1) {
+          $Lldp->neighbor_del({
+            OBJ_ID => $obj_list->{$ip},
+            NGR_ID => $obj_list->{$2}, 
+          });
+        }
+      }
+    }
+    $tree{$ip} = 2 if $tree{$ip} != 0;
   }
   
   return 1;
