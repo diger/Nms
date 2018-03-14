@@ -91,4 +91,14 @@ CREATE TABLE `nms_obj_triggers` (
   FOREIGN KEY (`obj_id`) REFERENCES `nms_obj` (`id`) ON DELETE CASCADE
 ) COMMENT='Nms object triggers'
 
+CREATE TABLE `nms_modules` (
+  `id` smallint(6) unsigned NOT NULL AUTO_INCREMENT,
+  `objectid` varchar(50) NOT NULL,
+  `module` varchar(100) NOT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `mod_desc` (`objectid`,`module`),
+  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE
+) COMMENT='Nms snmp modules'
+
 

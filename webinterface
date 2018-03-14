@@ -1010,14 +1010,12 @@ sub nms_modules {
       ID        => $FORM{ID}||'',
       MODULE    => $FORM{MODULE},
       OBJECTID  => $FORM{OBJECTID},
-      DESCR     => $FORM{DESCR},
       STATUS    => $FORM{STATUS} || 0
     } );
   }
   my $modules = $Nms->modules_list({ 
     ID        => $FORM{chg},
     MODULE    => '_SHOW',
-    DESCR     => '_SHOW',
     STATUS    => '_SHOW',
     COLS_NAME => 1,
     %LIST_PARAMS,
@@ -1032,7 +1030,6 @@ sub nms_modules {
 
     print $html->form_main({
           	CONTENT => 
-              label_w_txt($lang{DESCRIBE}, $modules->[0]->{descr} ||'', {INP=>'input', ID=>'DESCR'}).
               label_w_txt($lang{NAME}, $modules->[0]->{module} || '', {INP=>'select', SELECT => \@mods, ID=>'MODULE' }).
               label_w_txt($lang{STATUS}, $html->form_input('STATUS', 1, {
                               TYPE => 'checkbox',
@@ -1056,7 +1053,7 @@ sub nms_modules {
     result_former({
       INPUT_DATA      => $Nms,
       LIST            => $modules,
-      DEFAULT_FIELDS  => 'MODULE, DESCR, STATUS',
+      DEFAULT_FIELDS  => 'MODULE, STATUS',
       HIDDEN_FIELDS   => 'OBJECTID',
       FUNCTION_FIELDS => 'change, del',
       SKIP_USER_TITLE => 1,

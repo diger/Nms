@@ -407,7 +407,6 @@ sub modules_list {
 
   my $WHERE =  $self->search_former($attr, [
     ['MODULE',   'STR', 'module',   1 ],
-    ['DESCR',    'STR', 'descr',    1 ],
     ['STATUS',   'INT', 'status',   1 ],
     ['OBJECTID', 'STR', 'objectid', 1 ],
     ['ID',       'INT', 'id',       1 ],
