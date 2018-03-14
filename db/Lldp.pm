@@ -51,18 +51,15 @@ sub neighbors_list {
   $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : '';
 
   my $WHERE =  $self->search_former($attr, [
-    ['ID',        'INT',  'id',        1 ],
     ['OBJ_ID',    'INT',  'obj_id',      1 ],
     ['NGR_ID',    'INT',  'neighbor_id', 1 ],
     ['LOC_PORT',  'INT',  'loc_port',    1 ],
-    ['TYPE',      'STR',  'type',        1 ],
-	  ['TIMEMARK',  'INT',  'timemark',    1 ],
     ],
     { WHERE => 1,
     }
   );
 
-  $self->query2("SELECT $self->{SEARCH_FIELDS} id
+  $self->query2("SELECT $self->{SEARCH_FIELDS} obj_id
     FROM nms_obj_lldp
     $WHERE
     ORDER BY $SORT $DESC;",
@@ -117,12 +114,9 @@ sub neighbor_add {
 #**********************************************************
 sub neighbor_del {
   my $self = shift;
-  my ($attr) = @_;
+  my ($attr,$clear) = @_;
 
-  $self->query_del('nms_obj_lldp', $attr, {
-    obj_id      => $attr->{OBJ_ID},
-    neighbor_id => $attr->{NGR_ID}
-  });
+  $self->query_del('nms_obj_lldp', $attr, undef, { CLEAR_TABLE => $clear } );
 
   return $self;
 }

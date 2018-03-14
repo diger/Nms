@@ -55,6 +55,7 @@ my $Redis = Redis->new( server => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $Lldp = Lldp->new( $db, $Admin, \%conf );
 my $ctime = time;
+my $status = 0;
 
 if ($argv->{DEBUG}) {
   $debug = $argv->{DEBUG};
@@ -65,16 +66,17 @@ if ($argv->{help}) {
 }
 
 if ($argv->{INIT}) {
+  if ( $argv->{INIT} eq 'LLDP') {
+    nms_lldp();
+    exit;
+  }
   nms_init();
   exit;
 }
 
-if ($argv->{LLDP}) {
-  nms_lldp();
-  exit;
+if ( nms_poll() ){
+  nms_lldp() if $argv->{LLDP}
 }
-
-nms_poll();
 #**********************************************************
 =head2 nms_init($attr)
 
@@ -91,58 +93,32 @@ sub nms_init {
 		$Nms->{debug}=1;
 	}
 
-	if ($argv->{NAS_IPS}) {
-		$LIST_PARAMS{NAS_IP} = $argv->{NAS_IPS};
-	}
-
-  my $obj_list = $Nms->obj_list( {
-    COLS_NAME    => 1,
-    PAGE_ROWS    => 100000,
-    SYS_OBJECTID => '_SHOW',
-		NAS_ID       => '_SHOW',
-    IP           => $argv->{NAS_IPS} || '_SHOW',
-  } );
-
   my $vl = SNMP::VarList->new(['sysObjectID', 0],
                              ['sysDescr', 0],
                              ['sysName', 0],
-                             ['sysLocation', 0],
-                             ['sysUpTime', 0]);
+                             ['sysLocation', 0]);
 
-  if ($argv->{DISC}) {
-    $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
-    $snmpparms{Timeout} = 400000;
-	  my $ip = Net::IP->new( $argv->{IPS} || $conf{NMS_NET});
-	  do {
-      $snmpparms{DestHost} = $ip->ip();
-		  $sess = SNMP::Session->new(%snmpparms);
-		  print $ip->ip() . "\n" if $debug > 0;
-		  my @result = $sess->get($vl);
-      print Dumper \@result if $debug > 0;
+  $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
+  my $ip = Net::IP->new( $conf{NMS_NET} );
+  do {
+    $snmpparms{DestHost} = $ip->ip();
+	  $sess = SNMP::Session->new(%snmpparms);
+	  print $ip->ip() . "\n" if $debug > 0;
+	  my @result = $sess->get($vl);
+    print Dumper \@result if $debug > 0;
+    if ( @result && $debug < 2 ) {
       $Nms->obj_add({ 
         IP => ip2int($ip->ip()),
         SYS_OBJECTID => $result[0],
         SYS_NAME     => $result[2],
         SYS_LOCATION => $result[3],
-      }) if (@result && $debug < 2);
-	  } while (++$ip);
-  }
-
-  foreach my $obj (@$obj_list) {
-
-    $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
-    $snmpparms{DestHost} = $obj->{ip};
-	  $sess = SNMP::Session->new(%snmpparms);
-	  print $obj->{ip} . "\n" if $debug > 0;
-    my @result = $sess->get($vl);
-    if (@result) {
-      print Dumper \@result if $debug > 0;
-        $Nms->sysobjectid_add({ 
-          OBJECTID => $result[0],
-          LABEL    => $SNMP::MIB{$result[0]}{label},
-        }) if $debug < 1;
+      });
+      $Nms->sysobjectid_add({ 
+        OBJECTID => $result[0],
+        LABEL    => $SNMP::MIB{$result[0]}{label},
+      });
     }
-  }
+  } while (++$ip);
 
   return 1;
 }
@@ -158,14 +134,16 @@ sub nms_poll {
     PAGE_ROWS    => 100000,
     IP           => '_SHOW',
     SYS_OBJECTID => '_SHOW',
+    SYS_LOCATION => '_SHOW',
+    SYS_NAME     => '_SHOW',
     STATUS       => '_SHOW',
   } );
 
   foreach my $obj (@$obj_list) {
     my @mibs;
-    push @mibs, ['sysObjectID', 0];
- #   push @mibs, ['sysName', 0];
-#    push @mibs, ['sysLocation', 0];
+    push @mibs, SNMP::Varbind->new(['sysObjectID', 0]);
+    push @mibs, SNMP::Varbind->new(['sysName', 0]);
+    push @mibs, SNMP::Varbind->new(['sysLocation', 0]);
     my $triggers;
     if ($argv->{STATS}){
       $triggers = $Nms->triggers_list({
@@ -176,7 +154,7 @@ sub nms_poll {
       });
       if ($triggers){
         foreach my $vr (@$triggers){
-          push @mibs, [$vr->{label},$vr->{iid}];
+          push @mibs, SNMP::Varbind->new([$vr->{label},$vr->{iid}]);
         }
       }
     }
@@ -192,7 +170,8 @@ sub nms_poll {
 
     &SNMP::MainLoop(2);
   }
-  return 1;
+  return 1 if $status;
+  return undef;
 }
 
 #**********************************************************
@@ -204,35 +183,40 @@ sub nms_clb {
   my ($obj,$tr,$vl) = @_;
   if ( defined $vl->[0] ) {
     &SNMP::finish();
-    if ($vl->[0]->[2] ne $obj->{sysobjectid}){
-      $Nms->obj_add({ 
-        ID           => $obj->{id},
-        SYS_OBJECTID => $vl->[0]->[2],
-      })
+    my %sys;
+    foreach my $var (@$vl){
+      $sys{SYS_OBJECTID} = $var->val if $var->tag eq 'sysObjectID';
+      $sys{SYS_LOCATION} = $var->val if $var->tag eq 'sysLocation';
+      $sys{SYS_NAME} = $var->val if $var->tag eq 'sysName';
+      if ( $tr ){
+        foreach my $trig (@$tr){
+          if ( $var->tag eq $trig->{label} && $var->iid == $trig->{iid} ) {
+            $Redis->zadd( "$trig->{id}", $ctime, $var->val );
+          }
+        }
+      }
     }
-    if ( $obj->{status} != 0 ){
+    if ( $obj->{status} != 0 || $argv->{UPD}){
+      $status = 1;
       $Nms->obj_add({ 
         ID     => $obj->{id},
-        STATUS => 0
+        STATUS => 0,
+        %sys
       });
-    }
-    if ( $tr ){
-      print Dumper $vl if $debug > 2;
-      foreach my $ind (0..@$tr-1){
-        $Redis->zadd( "$tr->[$ind]->{id}", $ctime, $vl->[$ind+1]->[2] );
-      }
     }
     print "$obj->{id} Ok \n" if $debug > 1;
   }
   else {
     if ( $obj->{status} != 1 ){
+      $status = 1;
       $Nms->obj_add({ 
         ID     => $obj->{id},
         STATUS => 1
       })
     }
-    print "$obj->{id} fall \n" if $debug > 1;
+    print "$obj->{id} fail \n" if $debug > 1;
   }
+
   return();
 }
 
@@ -248,6 +232,7 @@ sub nms_lldp {
     STATUS     => 0,
     LIST2HASH  => 'ip, id'
   } );
+  $Lldp->neighbor_del(undef,1);
   $snmpparms{UseSprintValue} = 0;
   my %tree;
   my @arr =  ($conf{NMS_LLDP_ROOT});
@@ -285,8 +270,8 @@ sub nms_lldp {
         }
         elsif ( $tree{$ip} == $1) {
           $Lldp->neighbor_del({
-            OBJ_ID => $obj_list->{$ip},
-            NGR_ID => $obj_list->{$2}, 
+            obj_id      => $obj_list->{$ip},
+            neighbor_id => $obj_list->{$2},
           });
         }
       }
