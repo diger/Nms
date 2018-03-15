@@ -14,6 +14,6 @@
     "13:0:NMS:nms_reports:"                 => 4,
 );
 
-%PERIODIC = ( daily => ['nms_traps_clean'] );
+%PERIODIC = ( daily => ['nms_traps_clean','nms_stats_clean'] );
 
 1

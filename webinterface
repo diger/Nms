@@ -2035,7 +2035,11 @@ qq/onclick=\"loadToModal('index.cgi?qindex=$index$pages_qs&header=2')\"/
 
 #********************************************************
 sub nms_stats_clean {
-    $Redis->zremrangebyscore( { PERIOD => $conf{STATS_CLEAN_PERIOD} || 30 } );
+    my $stats = $Nms->triggers_list({ COLS_NAME => 1 });
+    my $ctime  = time - ($conf{STATS_CLEAN_PERIOD} || 90)*3600*24;
+    foreach my $st ( @$stats ) {
+      $Redis->zremrangebyscore($st->{id}, -1, $ctime);
+    }
     return 1;
 }
 
