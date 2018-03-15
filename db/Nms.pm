@@ -396,7 +396,8 @@ sub sysobjectid_add {
 
 =cut
 #**********************************************************
-sub modules_list {
+sub modules_list
+ {
   my $self = shift;
   my ($attr) = @_;
 
