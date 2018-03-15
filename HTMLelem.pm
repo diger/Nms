@@ -126,26 +126,23 @@ sub table_header2 {
 =cut
 #**********************************************************
 sub make_tree {
-  my ($attr) = @_;
+  my ($attr,$id) = @_;
   my $result = '';
-  my $TREE_ID = 'MY_TREE';
+  my $TREE_ID = (!$id)?'MY_TREE':$id;
   my %all;
   
-  $all{core}{themes} = ({ name => 'proton', responsive => 'true' });
-  $all{core}{data} = $attr->{data};
+  $all{core}{themes} = ({ variant => 'medium', responsive => 'true' }) if !$attr->{core}->{themes};
   $all{plugins} = ($attr->{plugins})? $attr->{plugins}:'search';
   $all{search} = ($attr->{search})? $attr->{search}:({ case_insensitive => 'true', show_only_matches => 'false' });
-  $all{contextmenu} = ({ items => $attr->{contextmenu} }) if $attr->{contextmenu};
-  $all{types} = $attr->{types} if $attr->{types};
-#  print JSON->new->encode(\%all);
+  %all = (%all,%$attr);
   my $DATA  = JSON->new->indent->encode(\%all);
-  $DATA =~ s/"$attr->{contextmenu}"/$attr->{contextmenu}/;
   $DATA =~ s/"false"/false/g;
   $DATA =~ s/"true"/true/g;
+  $DATA =~ s/\"\*|\*\"/ /g;
   $DATA =~ s/"/'/g;
   
   $result.= qq{
-    <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/proton/style.min.css' />
+    <link rel='stylesheet' href='/styles/lte_adm/plugins/jstree/themes/default/style.min.css' />
     <script type='text/javascript' src='/styles/lte_adm/plugins/jstree/jstree.min.js'></script>
     <div id=$TREE_ID></div>
   };

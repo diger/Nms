@@ -36,7 +36,7 @@ $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
 sub neighbors_view {
   my ($attr) = @_;
 
-  if ($FORM{ID}){
+  if ($FORM{TREE_ID}){
     my $nms_index = get_function_index( 'nms_obj' );
     my $nms = $Nms->obj_list({
       IP           => '_SHOW',
@@ -44,16 +44,16 @@ sub neighbors_view {
       SYS_LOCATION => '_SHOW',
       SYS_OBJECTID => '_SHOW',
       STATUS       => '_SHOW',
-      ID           => $FORM{ID},
+      ID           => $FORM{TREE_ID},
       COLS_NAME    => 1,
     });
-    my $stbl = nms_snmp_table({ ID => $FORM{ID}, OID => 'lldpRemTable', HASH => 1 });
+    my $stbl = nms_snmp_table({ ID => $FORM{TREE_ID}, OID => 'lldpRemTable', HASH => 1 });
     my %remp;
     foreach my $key ( keys %$stbl ) {
  #     $stbl->{$key}->{lldpRemPortId} =~ s|1/||;
       $remp{$stbl->{$key}->{lldpRemLocalPortNum}} = [$stbl->{$key}->{lldpRemSysName},$stbl->{$key}->{lldpRemPortId}];
     }
-    my $matbl = nms_snmp_table({ ID => $FORM{ID}, OID => 'lldpRemManAddrTable', HASH => 1 });
+    my $matbl = nms_snmp_table({ ID => $FORM{TREE_ID}, OID => 'lldpRemManAddrTable', HASH => 1 });
     my %bd;
     my %outputs;
     my %inputs;
@@ -121,6 +121,7 @@ sub neighbors_view {
                   class => 'col-md-4',
                   style => 'overflow-y: scroll;height:75vh;outline: 1px solid silver'
                 });
+  my $ID = ($attr->{ID})?$attr->{ID}:1;
   my $scr = qq(
    <script>
     jQuery(".search-input").keypress(function(e) {
@@ -131,10 +132,16 @@ sub neighbors_view {
       }
     });
     jQuery("#MY_TREE").bind("loaded.jstree", function(event, data) {
-      data.instance.open_node(1);
+      var id = $ID;
+      if ( id == 1 ){
+        data.instance.open_node(1);
+      }
+      else {
+        data.instance.select_node($ID);
+      }
     });
     function renewLeftBox(id){
-      var url = 'index.cgi?qindex=$index&header=2&ID=' + id;
+      var url = 'index.cgi?get_index=neighbors_view&header=2&TREE_ID=' + id;
       jQuery('#RESULT').load(url);
     };
     jQuery('#MY_TREE').on("changed.jstree", function (e, data) {
@@ -240,7 +247,7 @@ sub neighbors_tree {
     }
   }
 
-  return make_tree({ data => \@lldp_tree, plugins => ['search','sort'] })
+  return make_tree({ core => { data => \@lldp_tree }, plugins => ['search','sort'] })
 }
 
 

@@ -14,6 +14,7 @@ use Abills::Filters qw(_mac_former dec2hex);
 require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
+use Nms::db::Lldp;
 use SNMP;
 use Nms::HTMLelem qw(label_w_txt table_header2 make_tree oid_enums);
 
@@ -25,6 +26,7 @@ our ($html,
 );
 
 our $Nms = Nms->new( $db, $admin, \%conf );
+our $Lldp = Lldp->new( $db, $admin, \%conf );
 
 SNMP::addMibDirs( '../../var/snmp/mibs' );
 SNMP::addMibDirs( '../../var/snmp/mibs/private' );
@@ -234,6 +236,9 @@ sub nms_obj {
     if ( $Nms->triggers_list({ OBJ_ID => $obj_id }) ) {
       push @header_arr, [$lang{STATS},"$head_index&visual=STATS$pages_qs"];
     }
+    if ( $Lldp->neighbors_list({ OBJ_ID => $obj_id }) ) {
+      push @header_arr, ['Tree',"$head_index&visual=TREE$pages_qs"];
+    }
     push @header_arr, ['MIBs Browser',"$head_index&visual=MIB_BR$pages_qs"];
     push @header_arr, [$lang{EVENTS},"$head_index&visual=TRAPS$pages_qs"];
 
@@ -285,7 +290,10 @@ sub nms_obj {
     } 
     elsif ($visual eq 'STATS') {
       nms_trigger({ ID => $obj_id });
-    } 
+    }
+    elsif ($visual eq 'TREE') {
+      neighbors_view({ ID => $obj_id });
+    }
     elsif ($visual eq 'MIB_BR') {
       mibs_browser({ ID => $obj_id });
     }
@@ -748,9 +756,6 @@ sub mibs_browser {
         jQuery('#MY_TREE').jstree('search', searchString);
       }
     });
-  	jQuery.jstree.defaults.contextmenu.items = { };
-    jQuery('#MY_TREE').on('contextmenu', '.jstree-anchor', function (e) {
-  	});
   </script>); 
 
   print $html->element('div', $tree.$res,{class=>'row'}) . $scr;
@@ -1155,6 +1160,9 @@ sub mibs_tree {
       elsif ( $SNMP::MIB{$oid}{type}){
         $type{type} = 'scalar';
       }
+      else {
+        $type{type} = 'folder';
+      }
       push @tree_arr, ({
         id   => $SNMP::MIB{$oid}{objectID},
         text => $SNMP::MIB{$oid}{label},
@@ -1167,45 +1175,34 @@ sub mibs_tree {
   print qq(
     <script>
       function customMenu(node) {
-          var items = {
-              Get: {
+          var items = {};
+
+          if (node.type === 'scalar') {
+            items.Get =  {
                   label: 'Get',
-                  icon : 'glyphicon glyphicon-download',
+                  icon : 'fa fa-angle-down',
                   action: function () {
                     renewLeftBox(node.id,'GET');
                   }
-              },
-              Table: { 
-                  label: 'Table',
-                  icon : 'glyphicon glyphicon-list-alt',
-                  action: function () {
-                    renewLeftBox(node.id,'TABLE');
-                  }
-              },
-              Walk: { 
+            }        
+          }
+          if (node.type === 'row' || node.type === 'table') {
+            items.Walk = { 
                   label: 'Walk',
-                  icon : 'glyphicon glyphicon-circle-arrow-down',
+                  icon : 'fa fa-angle-double-down',
                   action: function () {
                     renewLeftBox(node.id,'WALK');
                   }
-              }
-          };
-
-          if (node.type === 'scalar') {
-            delete items.Table;
-            delete items.Walk;            
+            }
           }
-          else if (node.type === 'row') {
-            delete items.Get;
-            delete items.Table;
-          }
-          else if (node.type === 'table') {
-            delete items.Get;
-          }
-          else {
-            delete items.Table;
-            delete items.Walk;
-            delete items.Get;
+          if (node.type === 'table') {
+            items.Table = { 
+                  label: 'Table',
+                  icon : 'fa fa-table',
+                  action: function () {
+                    renewLeftBox(node.id,'TABLE');
+                  }
+            }
           }
 
           return items;
@@ -1213,15 +1210,16 @@ sub mibs_tree {
 	  </script>
    );
   my %types = (
-   table  => { icon => 'glyphicon glyphicon-list-alt' },
-   row    => { icon => 'glyphicon glyphicon-option-horizontal' },
-   scalar => { icon => 'glyphicon glyphicon-file' }
+   table  => { icon => 'fa fa-table' },
+   row    => { icon => 'fa fa-columns' },
+   scalar => { icon => 'fa fa-paragraph' },
+   folder => { icon => 'fa fa-folder-o' },
   );
   return make_tree({
     plugins => ['types', 'search', 'contextmenu'],
-    contextmenu => 'customMenu',
+    contextmenu => { items => '*customMenu*' },
     types => \%types,
-    data => \@tree_arr });
+    core => { data => \@tree_arr } });
 }
 
 #**********************************************************
