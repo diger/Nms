@@ -1482,6 +1482,9 @@ sub mibs_tree {
             elsif ( $SNMP::MIB{$oid}{type} ) {
                 $type{type} = 'scalar';
             }
+            elsif ( $SNMP::MIB{$oid}{indexes}[0] ) {
+                $type{type} = 'indexes';
+            }
             else {
                 $type{type} = 'folder';
             }
@@ -1511,7 +1514,7 @@ sub mibs_tree {
                   }
             }        
           }
-          if (node.type === 'row' || node.type === 'table') {
+          if (node.type === 'row' || node.type === 'table' || node.type === 'indexes') {
             items.Walk = { 
                   label: 'Walk',
                   icon : 'fa fa-angle-double-down',
@@ -1538,6 +1541,7 @@ sub mibs_tree {
         table  => { icon => 'fa fa-table' },
         row    => { icon => 'fa fa-columns' },
         scalar => { icon => 'fa fa-paragraph' },
+        indexes => { icon => 'fa fa-list-ul' },
         folder => { icon => 'fa fa-folder-o' },
     );
     return make_tree(

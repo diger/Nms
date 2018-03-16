@@ -8,10 +8,11 @@
     "7:1:Traps:nms_trap_types:"             => 5,
     "8:0:NMS:nms_monitor:"                  => 6,
     "9:0:NMS:nms_obj:"                      => 8,
-    "10:0:Traps:nms_traps:"                 => 8,
-    "11:0:NMS Tree:neighbors_view:"         => 8,
-    "12:0:NMS:nms_client_obj:UID"           => 20,
-    "13:0:NMS:nms_reports:"                 => 4,
+    "10:0:MIBS browser:mibs_browser:ID"     => 8,
+    "11:0:Traps:nms_traps:"                 => 8,
+    "12:0:NMS Tree:neighbors_view:"         => 8,
+    "13:0:NMS:nms_client_obj:UID"           => 20,
+    "14:0:NMS:nms_reports:"                 => 4,
 );
 
 %PERIODIC = ( daily => ['nms_traps_clean','nms_stats_clean'] );
