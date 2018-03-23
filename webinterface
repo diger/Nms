@@ -146,13 +146,23 @@ sub nms_obj {
         { LABEL => '_SHOW', LIST2HASH => 'objectid,label' } );
     my $so_index = get_function_index('nms_sysobjectid');
 
-    if ( $FORM{SET} && $FORM{header} ) {
-        return nms_snmp_set(
+    if ( $FORM{SET} ) {
+        if ( $FORM{IN_MODAL} ) {
+            return nms_snmp_set(
+                {
+                    ID    => $FORM{ID},
+                    LABEL => $FORM{SET},
+                    IID   => $FORM{IID},
+                    VALUE => $FORM{VAL}
+                }
+            );
+        }
+        nms_snmp_set(
             {
                 ID    => $FORM{ID},
-                LABEL => $FORM{SET},
+                LABEL => $FORM{LABEL},
                 IID   => $FORM{IID},
-                VALUE => $FORM{VAL}
+                VALUE => $FORM{VALUE} || 0
             }
         );
     }
@@ -168,16 +178,7 @@ sub nms_obj {
             }
         );
     }
-    if ( $FORM{LABEL} && $FORM{SET} ) {
-        nms_snmp_set(
-            {
-                ID    => $FORM{ID},
-                LABEL => $FORM{LABEL},
-                IID   => $FORM{IID},
-                VALUE => $FORM{VALUE} || 0
-            }
-        );
-    }
+
     my $nms = $Nms->obj_list(
         {
             IP => $FORM{IP} || '_SHOW',
@@ -425,7 +426,7 @@ sub nms_obj_data {
     my $uid = ( $FORM{UID} ) ? "&UID=$FORM{UID}" : '';
     foreach my $b (@$info) {
         if ( $FORM{UID} ) {
-            if ( grep { $_ =~ /ifIndex|PortIndex|ProtIndex/ }
+            if ( grep { $_ =~ /ifIndex|PortIndex|ProtIndex|IfIndex/ }
                 @{ $SNMP::MIB{ $b->{label} }{children}[0]{indexes} } )
             {
                 my $rows = $Nms->oids_rows_list(
@@ -1538,11 +1539,11 @@ sub mibs_tree {
 	  </script>
    );
     my %types = (
-        table  => { icon => 'fa fa-table' },
-        row    => { icon => 'fa fa-columns' },
-        scalar => { icon => 'fa fa-paragraph' },
+        table   => { icon => 'fa fa-table' },
+        row     => { icon => 'fa fa-columns' },
+        scalar  => { icon => 'fa fa-paragraph' },
         indexes => { icon => 'fa fa-list-ul' },
-        folder => { icon => 'fa fa-folder-o' },
+        folder  => { icon => 'fa fa-folder-o' },
     );
     return make_tree(
         {
@@ -1960,7 +1961,7 @@ sub nms_client_obj {
     my ($attr) = @_;
     my $Dhcphosts = Dhcphosts->new( $db, $admin, \%conf );
     my $nms_index = get_function_index('nms_obj');
-
+    
     my $dhcp = $Dhcphosts->hosts_list(
         {
             COLS_NAME => 1,
@@ -1981,6 +1982,32 @@ sub nms_client_obj {
                 SYS_OBJECTID => '_SHOW',
             }
         );
+        $Nms->query2(
+            "SELECT _onu_mac AS ONU_MAC FROM users_pi WHERE uid='$FORM{UID}';",
+            undef, { INFO => 1 } );
+        if ( $Nms->{ONU_MAC} ) {
+          load_mibs( { ID => $nms->[0]->{sysobjectid} } );
+          $snmpparms{UseSprintValue} = 1;
+          $snmpparms{Community}      = $conf{NMS_COMMUNITY_RO};
+          my $sess = SNMP::Session->new( DestHost => $nms->[0]->{ip}, %snmpparms );
+          my $onu_id = $sess->bulkwalk( 0, 1, ['onuID'] );
+          my %onu_macs;
+          foreach my $mac (@{$onu_id->[0]}) {
+            my @onu_mac = ();
+            my @list = split ( ':', $mac->[2] );
+            foreach my $oct (@list) {
+              if ( length($oct) < 2 ) {
+                $oct = "0$oct"
+              }
+              push @onu_mac, $oct;
+            }
+            $onu_macs{join(":",@onu_mac)} = $mac->[1];
+          }
+          if ( exists $onu_macs{$Nms->{ONU_MAC}} ) {
+            $dhcp->[0]->{ports} = $onu_macs{$Nms->{ONU_MAC}};
+            $dhcp->[0]->{mac} = $Nms->{ONU_MAC};
+          };
+        }
         if ( $FORM{IN_MODAL} ) {
             cable_test(
                 {
@@ -2039,13 +2066,12 @@ qq/onclick=\"loadToModal('index.cgi?qindex=$index$pages_qs&header=2')\"/
 
 #********************************************************
 sub nms_stats_clean {
-    my $stats = $Nms->triggers_list({ COLS_NAME => 1 });
-    my $ctime  = time - ($conf{STATS_CLEAN_PERIOD} || 90)*3600*24;
-    foreach my $st ( @$stats ) {
-      $Redis->zremrangebyscore($st->{id}, -1, $ctime);
+    my $stats = $Nms->triggers_list( { COLS_NAME => 1 } );
+    my $ctime = time - ( $conf{STATS_CLEAN_PERIOD} || 90 ) * 3600 * 24;
+    foreach my $st (@$stats) {
+        $Redis->zremrangebyscore( $st->{id}, -1, $ctime );
     }
     return 1;
 }
-
 
 1;

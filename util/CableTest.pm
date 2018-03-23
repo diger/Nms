@@ -17,6 +17,12 @@ use Nms::HTMLelem qw(label_w_txt table_header2 oid_enums);
 
 our ( %lang, $Nms, $html, %conf, $admin, $db );
 
+my %snmpparms;
+$snmpparms{Version}   = 2;
+$snmpparms{Retries}   = 1;
+$snmpparms{Timeout}   = 2000000;
+$snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
+
 #**********************************************************
 
 =head2 cable_test()
@@ -28,6 +34,10 @@ sub cable_test {
     my ($attr) = @_;
     my $nms_index = get_function_index('nms_obj');
 
+    load_mibs( { ID => $attr->{OBJECTID} } );
+    if ( pon_test( { UID => $FORM{UID}, IP => $attr->{IP} } ) ) {
+        return 1;
+    }
     my $test_param = $Nms->oids_list(
         {
             OBJECTID  => $attr->{OBJECTID},
@@ -47,12 +57,6 @@ sub cable_test {
         push @{ $pair{ $test_param->{$key} } }, $key;
     }
 
-    load_mibs( { ID => $attr->{OBJECTID} } );
-    my %snmpparms;
-    $snmpparms{Version}   = 2;
-    $snmpparms{Retries}   = 1;
-    $snmpparms{Timeout}   = 2000000;
-    $snmpparms{Community} = $attr->{COMMUNITY} || $conf{NMS_COMMUNITY_RW};
     my $sess = SNMP::Session->new( DestHost => $attr->{IP}, %snmpparms );
     my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
     my $vb = SNMP::Varbind->new( [ $mib, $attr->{PORT}, $value ] );
@@ -290,6 +294,30 @@ sub cable_test_edit {
     }
 
     return 1;
+}
+
+#**********************************************************
+
+=head2 pon_test()
+
+=cut
+
+#**********************************************************
+sub pon_test {
+    my ($attr) = @_;
+    $Nms->query2(
+        "SELECT _onu_mac AS ONU_MAC FROM users_pi WHERE uid='$attr->{UID}';",
+        undef, { INFO => 1 } );
+    if ( $Nms->{ONU_MAC} ) {
+      $snmpparms{UseSprintValue} = 1;
+      my $sess = SNMP::Session->new( DestHost => $attr->{IP}, %snmpparms );
+      my @result = $sess->bulkwalk( 0, 1, [ 'onuID' ] );
+      if ( $sess->{ErrorNum} ) {
+          return $html->message( 'err', $lang{ERROR}, $sess->{ErrorStr} );
+      }
+      print Dumper @result;
+    }
+    return $Nms->{ONU_MAC};
 }
 
 1;
