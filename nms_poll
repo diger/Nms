@@ -312,8 +312,8 @@ sub nms_lldp {
                 elsif ( $tree{$ip} == $1 ) {
                     $Lldp->neighbor_del(
                         {
-                            obj_id      => $obj_list->{$ip},
-                            neighbor_id => $obj_list->{$2},
+                            OBJ_ID => $obj_list->{$ip},
+                            NEI_ID => $obj_list->{$2},
                         }
                     );
                 }

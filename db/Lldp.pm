@@ -126,7 +126,15 @@ sub neighbor_del {
     my $self = shift;
     my ( $attr, $clear ) = @_;
 
-    $self->query_del( 'nms_obj_lldp', $attr, undef, { CLEAR_TABLE => $clear } );
+    $self->query_del(
+        'nms_obj_lldp',
+        undef,
+        {
+            obj_id      => $attr->{OBJ_ID},
+            neighbor_id => $attr->{NEI_ID},
+        },
+        { CLEAR_TABLE => $clear }
+    );
 
     return $self;
 }
