@@ -80,11 +80,8 @@ sub traps_list {
     my $list = $self->{list};
 
     if ( $self->{TOTAL} > 0 && !$attr->{MONIT} ) {
-        $self->query2(
-            "SELECT COUNT(*) AS total
-    FROM nms_traps
-    $WHERE;", undef, { INFO => 1 }
-        );
+        $self->query2( "SELECT COUNT(*) AS total FROM nms_traps t $WHERE;",
+            undef, { INFO => 1 } );
     }
 
     return $self->{list_hash} if ( $attr->{LIST2HASH} );
