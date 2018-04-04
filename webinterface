@@ -1573,10 +1573,12 @@ sub nms_monitor {
       function loadNowPlaying(){
         jQuery("#MONIT").load(url);
       }
+      jQuery(document).ready(function() {
+        timerId = setInterval(function(){loadNowPlaying()}, 60000);
+      });
       jQuery("input[name=toggle]").change(function(){
        if(jQuery(this).is(':checked')){
          ref_timer = (jQuery("#timer").val() >= 10 ) ? jQuery("#timer").val() : 60;
-       //  alert(ref_timer);
          timerId = setInterval(function(){loadNowPlaying()}, ref_timer*1000);
        }
        else{
@@ -1590,11 +1592,12 @@ sub nms_monitor {
         $html->element(
             'input', undef,
             {
-                type => 'checkbox',
-                name => 'toggle'
+                type    => 'checkbox',
+                name    => 'toggle',
+                checked => ""
             }
           )
-          . 'Refresh',
+          . $lang{REFRESH},
         { class => 'checkbox-inline' }
     );
     $refr .= $html->element(
