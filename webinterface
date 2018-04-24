@@ -154,6 +154,16 @@ sub nms_obj {
             }
         );
     }
+    if ( $FORM{LABEL} && $FORM{VALUE} ) {
+        nms_snmp_set(
+            {
+                ID    => $FORM{ID},
+                LABEL => $FORM{LABEL},
+                IID   => $FORM{IID},
+                VALUE => $FORM{VALUE}
+            }
+        );
+    }
 
     if ( $FORM{STAT} && $FORM{header} ) {
         return nms_trigger(
