@@ -326,14 +326,14 @@ sub nms_obj {
                     SEL_LIST => $Nms->obj_list(
                         {
                             IP           => '_SHOW',
-                            SYS_LOCATION => '_SHOW',
+                            SYS_NAME => '_SHOW',
                             COLS_NAME    => 1,
                             SORT         => 1,
                             PAGE_ROWS    => 10000,
                         }
                     ),
                     SEL_KEY        => 'id',
-                    SEL_VALUE      => 'ip,syslocation',
+                    SEL_VALUE      => 'ip,sysname',
                     NO_ID          => 1,
                     MAIN_MENU      => $index,
                     MAIN_MENU_ARGV => "chg=" . ( $obj_id || '' )
@@ -401,7 +401,7 @@ sub nms_obj_data {
     my ($attr) = @_;
 
     my $prm = load_mibs( { ID => $attr->{ID} } );
-    if ( $FORM{LABEL} && $FORM{VALUE} ) {
+    if ( $FORM{LABEL} && $FORM{VALUE} && !$FORM{visual} ) {
         nms_snmp_set(
             {
                 ID    => $FORM{ID},
