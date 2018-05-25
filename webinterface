@@ -368,7 +368,7 @@ sub nms_obj {
             nms_obj_data( { ID => $obj_id } );
         }
         elsif ( $visual eq 'STATS' ) {
-            nms_trigger( { ID => $obj_id } );
+            nms_trigger( { OBJ_ID => $obj_id } );
         }
         elsif ( $visual eq 'TREE' ) {
             neighbors_view( { ID => $obj_id } );
@@ -895,20 +895,25 @@ sub mibs_browser {
             }
             my $result_tbl = $html->table( {} );
             foreach my $val ( @{ $result[0] } ) {
-                my $edit = $html->button(
-                    $lang{CHANGE},
-                    "index=$index$pages_qs&OID=$FORM{OID}",
-                    {
-                        MESSAGE =>
-                          "$lang{CHANGE} $SNMP::MIB{$FORM{OID}}{label}",
-                        TEXT  => $lang{CHANGE},
-                        class => 'change'
-                    }
-                );
-                $result_tbl->addrow( @$val,
-                    ( $SNMP::MIB{ $FORM{OID} }{access} eq 'ReadWrite' )
-                    ? $edit
-                    : '' );
+              my $edit = '';
+              if (   $SNMP::MIB{ $val->[0] }{access}
+                  && $SNMP::MIB{ $val->[0] }{access} =~ /ReadWrite|WriteOnly/ )
+              {
+                  $edit .= $html->button(
+                      $lang{CHANGE},
+                      undef,
+                      {
+                          JAVASCRIPT     => '',
+                          SKIP_HREF      => 1,
+                          NO_LINK_FORMER => 1,
+                          class          => "change",
+                          title          => $lang{ADD},
+                          ex_params =>
+      qq/onclick=\"loadRawToModal('?get_index=nms_obj&ID=$ID&visual=MIB_BR&header=2&SET=$val->[0]&IID=$val->[1]&VAL=$val->[2]')\"/
+                      }
+                  );
+              }
+              $result_tbl->addrow( @$val, $edit);
             }
             print $result_tbl->show();
         }
