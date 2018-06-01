@@ -24,7 +24,7 @@ CREATE TABLE `nms_oids` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `lab_i_obj` (`label`,`iid`,`objectid`),
   KEY `objectid` (`objectid`),
-  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE
+  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) COMMENT='Equipment OIDS table';
 
 
@@ -98,7 +98,7 @@ CREATE TABLE `nms_modules` (
   `status` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `mod_desc` (`objectid`,`module`),
-  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE
+  FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) COMMENT='Nms snmp modules'
 
 
