@@ -1063,10 +1063,10 @@ sub nms_trigger {
     my $stats = $Nms->triggers_list(
         {
             COLS_NAME => 1,
-            OBJ_ID    => $attr->{OBJ_ID},
+            OBJ_ID    => $attr->{OBJ_ID} || '_SHOW',
             LABEL     => $attr->{LABEL} || '_SHOW',
             IID       => $attr->{IID} || '_SHOW',
-            MONIT     => '_SHOW',
+            MONIT     => $attr->{MONIT} || '_SHOW',
             SYS_NAME  => '_SHOW',
         }
     );
