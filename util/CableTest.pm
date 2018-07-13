@@ -15,13 +15,22 @@ use Dv;
 use Dhcphosts;
 use Nms::HTMLelem qw(label_w_txt table_header2 oid_enums);
 
-our ( %lang, $Nms, $html, %conf, $admin, $db );
+our ( %lang, $Nms, $html, %conf, $admin, $db, %utils_menu, %actions );
 
 my %snmpparms;
 $snmpparms{Version}   = 2;
 $snmpparms{Retries}   = 1;
 $snmpparms{Timeout}   = 2000000;
 $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
+
+$utils_menu{CableTest} = ({ 
+  cfg_menu  => 'CABLE',
+  user_menu => 'CABLE',
+ });
+$actions{'CABLE'} = ({ 
+  cfg_act  =>  \&cable_test_setup,
+  user_act  =>  \&cable_test,
+ });
 
 #**********************************************************
 
@@ -140,59 +149,6 @@ sub cable_test_setup {
     if ( $FORM{del} ) {
         $Nms->oid_del( $FORM{del} );
     }
-    if ( $FORM{OBJECTID} ) {
-        cable_test_edit( { OBJECTID => $FORM{OBJECTID} } );
-    }
-    elsif ( $FORM{add} ) {
-        $Nms->obj_oids_add(
-            {
-                LABEL   => $FORM{add},
-                SECTION => $FORM{SECT},
-                TYPE    => $FORM{TYPE},
-            }
-        );
-        $html->redirect( 'index.cgi?&index=' . $index );
-    }
-    elsif ( $FORM{ID} ) {
-        oid_table_row_edit( { OID_ID => $FORM{ID} } );
-    }
-    else {
-        result_former(
-            {
-                INPUT_DATA      => $Nms,
-                FUNCTION        => 'sysobjectid_list',
-                DEFAULT_FIELDS  => 'LABEL, OBJECTID',
-                FUNCTION_FIELDS => 'cable_test_setup:change:objectid',
-                SKIP_USER_TITLE => 1,
-                TABLE           => {
-                    qs => ( $FORM{OBJECTID} )
-                    ? "$pages_qs&OBJECTID=$FORM{OBJECTID}"
-                    : $pages_qs,
-                    ID => 'CABLE_TEST',
-                },
-                MAKE_ROWS => 1,
-                TOTAL     => 1
-            }
-        );
-    }
-
-    return 1;
-}
-
-#**********************************************************
-
-=head2 cable_test_edit()
-
-=cut
-
-#**********************************************************
-sub cable_test_edit {
-
-    my ($attr) = @_;
-
-    if ( $FORM{del} ) {
-        $Nms->oid_del( $FORM{del} );
-    }
     if ( $FORM{SAVE} ) {
         $Nms->obj_oids_add(
             {
@@ -202,6 +158,10 @@ sub cable_test_edit {
                 SECTION  => $FORM{TYPE},
             }
         );
+    }
+    
+    if ( $FORM{ID} ) {
+        oid_table_row_edit( { OID_ID => $FORM{ID} } );
     }
 
     if ( $FORM{add} ) {
@@ -259,6 +219,7 @@ sub cable_test_edit {
                     'index'    => $index,
                     'ID'       => $FORM{chg} || '',
                     'OBJECTID' => $FORM{OBJECTID},
+                    'oid_type' => 'CABLE'
                 },
             }
         );
@@ -273,8 +234,7 @@ sub cable_test_edit {
                 INPUT_DATA     => $Nms,
                 FUNCTION       => 'oids_list',
                 DEFAULT_FIELDS => 'LABEL,SECTION',
-                FUNCTION_FIELDS =>
-                  'cable_test_edit:change:id;section;label;objectid,del',
+                FUNCTION_FIELDS => ':change:id;objectid;&oid_type=CABLE,del',
                 HIDDEN_FIELDS => 'ID,OBJECTID',
                 EXT_TITLES    => {
                     label => "$lang{NAME}",
@@ -285,7 +245,7 @@ sub cable_test_edit {
                     qs => "$pages_qs&OBJECTID=$FORM{OBJECTID}",
                     ID => 'OID_LIST',
                     MENU =>
-"$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&add=1:add",
+"$lang{ADD}:index=$index$pages_qs&OBJECTID=$FORM{OBJECTID}&oid_type=CABLE&add=1:add",
                 },
                 MAKE_ROWS => 1,
                 TOTAL     => 1

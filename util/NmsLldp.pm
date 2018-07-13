@@ -11,9 +11,9 @@ use warnings FATAL => 'all';
 use Nms::db::Lldp;
 use Nms::HTMLelem qw(label_w_txt table_header2 make_tree oid_enums flowchart);
 
-our ( %lang, $Nms, $html, %conf, $admin, $db );
+our ( %lang, $Nms, $html, %conf, $admin, $db, %utils_menu, %actions );
 
-my $Lldp = Lldp->new( $db, $admin, \%conf );
+our $Lldp = Lldp->new( $db, $admin, \%conf );
 
 my %snmpparms;
 $snmpparms{Version}   = 2;
@@ -21,6 +21,14 @@ $snmpparms{Retries}   = 1;
 $snmpparms{Timeout}   = 2000000;
 $snmpparms{Community} = $conf{NMS_COMMUNITY_RO};
 
+if ( $Lldp->neighbors_list( { OBJ_ID => $FORM{ID} } ) ) {
+    $utils_menu{NmsLldp} = ({ obj_menu => 'TREE' });
+    $actions{'TREE'} = ({
+      obj_act  =>  \&neighbors_view
+    });
+}
+
+$FUNCTIONS_LIST{"13:0:NMS Tree:neighbors_view:"} = 8;
 #**********************************************************
 
 =head2 neighbors_view()

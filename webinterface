@@ -15,15 +15,13 @@ use Abills::Filters qw(_mac_former dec2hex);
 require Abills::Misc;
 use Data::Dumper;
 use Nms::db::Nms;
-use Nms::db::Lldp;
 use SNMP;
 use Redis;
 use Nms::HTMLelem qw(label_w_txt table_header2 make_tree oid_enums);
 
-our ( $html, %lang, $admin, %conf, $db, );
+our ( $html, %lang, $admin, %conf, $db, @NMS_UTILS, %utils_menu, %actions );
 
 our $Nms = Nms->new( $db, $admin, \%conf );
-our $Lldp = Lldp->new( $db, $admin, \%conf );
 our $Redis = Redis->new(
     server   => $conf{REDIS_SERV},
     encoding => undef,
@@ -40,10 +38,9 @@ $snmpparms{UseSprintValue} = 1;
 $snmpparms{Timeout}        = 2000000;
 $snmpparms{Community}      = $conf{NMS_COMMUNITY_RO};
 
-require Nms::util::CableTest;
-require Nms::util::NmsTraps;
-require Nms::util::NmsLldp;
-
+foreach my $util (@NMS_UTILS) {
+  require 'Nms/util/' . $util . '.pm';
+}
 #**********************************************************
 
 =head2 nms_obj_list()
@@ -309,13 +306,11 @@ sub nms_obj {
             push @header_arr,
               [ $lang{STATS}, "$head_index&visual=STATS$pages_qs" ];
         }
-        if ( $Lldp->neighbors_list( { OBJ_ID => $obj_id } ) ) {
-            push @header_arr, [ 'Tree', "$head_index&visual=TREE$pages_qs" ];
-        }
+        foreach my $item ( sort %utils_menu ) {
+            push @header_arr, [ $utils_menu{$item}{obj_menu}, "$head_index&visual=" . $utils_menu{$item}{obj_menu} . $pages_qs ] if $utils_menu{$item}{obj_menu};
+        }        
         push @header_arr,
           [ 'MIBs Browser', "$head_index&visual=MIB_BR$pages_qs" ];
-        push @header_arr,
-          [ $lang{EVENTS}, "$head_index&visual=TRAPS$pages_qs" ];
 
         my $buttons = table_header2( \@header_arr );
         if ($buttons) {
@@ -362,7 +357,6 @@ sub nms_obj {
                 }
             ) if !$FORM{IN_MODAL};
         }
-
         my $visual = $FORM{visual} || 'INFO';
         if ( $visual eq 'INFO' ) {
             nms_obj_data( { ID => $obj_id } );
@@ -370,14 +364,11 @@ sub nms_obj {
         elsif ( $visual eq 'STATS' ) {
             nms_trigger( { OBJ_ID => $obj_id } );
         }
-        elsif ( $visual eq 'TREE' ) {
-            neighbors_view( { ID => $obj_id } );
-        }
         elsif ( $visual eq 'MIB_BR' ) {
             mibs_browser( { ID => $obj_id } );
         }
-        elsif ( $visual eq 'TRAPS' ) {
-            nms_traps( { IP => $nms->[0]->{ip} } );
+        elsif ( exists $actions{$visual} ) {
+          &{$actions{$visual}{obj_act}}( { IP => $nms->[0]->{ip}, ID => $obj_id  } );
         }
         else {
             nms_snmp_table( { ID => $obj_id, SECT => $visual } );
@@ -1243,36 +1234,30 @@ sub nms_sysobjectid {
 
     my ($attr) = @_;
 
-    $LIST_PARAMS{OBJECTID} = $FORM{SYSOBJECTID};
-
-    #    $LIST_PARAMS{GROUP} = 'module';
-    result_former(
-        {
-            INPUT_DATA => $Nms,
-            FUNCTION   => 'sysobjectid_list',
-
-            #  DEFAULT_FIELDS  => 'SYSORID, MODULE, STATUS',
-            DEFAULT_FIELDS => 'LABEL, OBJECTID',
-            FUNCTION_FIELDS =>
-              'nms_modules:modules:objectid,oids_set:oids:objectid',
-            SKIP_USER_TITLE => 1,
-            FILTER_COLS     => {
-
-                #        ip   => "search_link:nms_obj:,ID",
-            },
-
-            #     SELECT_VALUE    => { sysObjectID => \%ohash },
-            TABLE => {
-                caption => " ",
-                qs      => ( $FORM{SYSOBJECTID} )
-                ? "$pages_qs&SYSOBJECTID=$FORM{SYSOBJECTID}"
-                : $pages_qs,
-                ID => 'SYSOBJECTID_LIST',
-            },
-            MAKE_ROWS => 1,
-            TOTAL     => 1
-        }
-    );
+    if ( $FORM{OBJECTID} ) {
+      return oids_set({ OBJECTID => $FORM{OBJECTID} });
+    }
+    else {
+      result_former(
+          {
+              INPUT_DATA => $Nms,
+              FUNCTION   => 'sysobjectid_list',
+              DEFAULT_FIELDS => 'LABEL, OBJECTID',
+              FUNCTION_FIELDS =>
+                ':change:objectid,:del:objectid',
+              SKIP_USER_TITLE => 1,
+              TABLE => {
+                  caption => " ",
+                  qs      => ( $FORM{SYSOBJECTID} )
+                  ? "$pages_qs&SYSOBJECTID=$FORM{SYSOBJECTID}"
+                  : $pages_qs,
+                  ID => 'SYSOBJECTID_LIST',
+              },
+              MAKE_ROWS => 1,
+              TOTAL     => 1
+          }
+      );
+    }
 
     return 1;
 }
@@ -1287,7 +1272,7 @@ sub nms_sysobjectid {
 sub nms_modules {
     my ($attr) = @_;
 
-    $LIST_PARAMS{OBJECTID} = $FORM{OBJECTID};
+    $LIST_PARAMS{OBJECTID} = $attr->{OBJECTID} || $FORM{OBJECTID};
     $pages_qs = "$pages_qs&OBJECTID=$FORM{OBJECTID}";
     if ( $FORM{del} ) {
         $Nms->module_del( $FORM{del} );
@@ -1311,7 +1296,7 @@ sub nms_modules {
             %LIST_PARAMS,
         }
     );
-    if ( $FORM{chg} || $FORM{add} ) {
+    if ( $FORM{chg} || $FORM{new} ) {
         SNMP::addMibFiles( glob( "../../var/snmp/mibs/private" . '/*' ) );
         my %mod;
         foreach my $oid ( keys(%SNMP::MIB) ) {
@@ -1369,7 +1354,7 @@ sub nms_modules {
                 INPUT_DATA      => $Nms,
                 LIST            => $modules,
                 DEFAULT_FIELDS  => 'MODULE, STATUS',
-                HIDDEN_FIELDS   => 'OBJECTID',
+                HIDDEN_FIELDS   => 'OBJECTID,TOTAL',
                 FUNCTION_FIELDS => 'change, del',
                 SKIP_USER_TITLE => 1,
                 STATUS_VALS     => [
@@ -1378,12 +1363,12 @@ sub nms_modules {
                 ],
                 TABLE => {
                     caption => "SNMP Modules",
-                    qs      => $pages_qs,
+                    qs      => "$pages_qs&MODULE=1",
                     ID      => 'MODULES_LIST',
-                    MENU    => "$lang{ADD}:index=$index$pages_qs&add=1:add",
+                    MENU    => "$lang{ADD}:index=$index$pages_qs&MODULE=1&new=1:add",
                 },
                 MAKE_ROWS => 1,
-                TOTAL     => 1
+                TOTAL     => 1,
             }
         );
     }
@@ -1645,16 +1630,14 @@ sub nms_monitor {
 sub oids_set {
     my ($attr) = @_;
 
-    my $prm = load_mibs( { ID => $FORM{ID} || $FORM{OBJECTID} } );
-    if ( $FORM{del} ) {
+    load_mibs({ ID => $attr->{OBJECTID} });
+    if ( $FORM{del} && $FORM{oid_type} ) {
         $Nms->oid_del( $FORM{del} );
     }
-    my $type = $FORM{oid_type} || 'main';
-    my $obj_id = $prm->{sysobjectid};
 
-    if ( $FORM{chg} && $type ne 'main' ) {
+    if ( !$FORM{MODULE} && $FORM{chg} && $FORM{oid_type} ne 'main' ) {
         return oid_table_row_edit(
-            { OID_ID => $FORM{chg}, OBJECTID => $obj_id } );
+            { OID_ID => $FORM{chg}, OBJECTID => $attr->{OBJECTID} } );
     }
 
     if ( $FORM{OID} ) {
@@ -1668,7 +1651,7 @@ sub oids_set {
                 LABEL    => $FORM{OID},
                 SECTION  => $sect,
                 TYPE     => $FORM{oid_type} || '',
-                OBJECTID => $obj_id,
+                OBJECTID => $attr->{OBJECTID},
                 VALUE    => $FORM{VALUE},
             }
         );
@@ -1679,28 +1662,35 @@ sub oids_set {
     }
 
     my @header_arr = (
-        "$lang{MAIN}:index=$index&oid_type=main&ID=$obj_id$pages_qs",
-        "TABLE:index=$index&oid_type=table&ID=$obj_id$pages_qs",
-        "SCALAR:index=$index&oid_type=scalar&ID=$obj_id$pages_qs"
+        "MODULES:index=$index&MODULE=1&OBJECTID=$attr->{OBJECTID}$pages_qs",
+        "MAIN:index=$index&oid_type=main&OBJECTID=$attr->{OBJECTID}$pages_qs",
+        "TABLE:index=$index&oid_type=table&OBJECTID=$attr->{OBJECTID}$pages_qs",
+        "SCALAR:index=$index&oid_type=scalar&OBJECTID=$attr->{OBJECTID}$pages_qs"
     );
+    foreach my $item ( sort %utils_menu ) {
+        push @header_arr, "$utils_menu{$item}{cfg_menu}:index=$index&oid_type=$utils_menu{$item}{cfg_menu}&OBJECTID=$attr->{OBJECTID}$pages_qs" if $utils_menu{$item}{cfg_menu};
+    }
 
     my $buttons = $html->table_header( \@header_arr, { TABS => 1 } );
     print $html->element( 'div', $buttons,
         { class => 'navbar navbar-default' } );
 
-    if ( $FORM{add} && $type ne 'main' ) {
+    if ( $FORM{oid_type} && exists $actions{$FORM{oid_type}} ) {
+      return &{$actions{$FORM{oid_type}}{cfg_act}}({ OBJECTID => $attr->{OBJECTID} });
+    }
+    elsif ( $FORM{add} && $FORM{oid_type} ne 'main' ) {
         mibs_browser();
     }
-    else {
-        $LIST_PARAMS{OBJECTID} = $obj_id;
-        $LIST_PARAMS{TYPE}     = $type;
+    elsif ( $FORM{oid_type} ) {
+        $LIST_PARAMS{OBJECTID} = $attr->{OBJECTID};
+        $LIST_PARAMS{TYPE}     = $FORM{oid_type};
         $LIST_PARAMS{ID}       = $FORM{chg} || '_SHOW';
         my ( $table, $list ) = result_former(
             {
                 INPUT_DATA      => $Nms,
                 FUNCTION        => 'oids_list',
                 DEFAULT_FIELDS  => 'SECTION,LABEL,IID,TYPE,ACCESS,VALUE',
-                FUNCTION_FIELDS => ( $type eq 'table' || $type eq 'main' )
+                FUNCTION_FIELDS => ( $FORM{oid_type} eq 'table' || $FORM{oid_type} eq 'main' )
                 ? "change,del"
                 : 'del',
                 HIDDEN_FIELDS => 'ID,OBJECTID',
@@ -1709,18 +1699,18 @@ sub oids_set {
                 },
                 SKIP_USER_TITLE => 1,
                 TABLE           => {
-                    qs      => "$pages_qs&OBJECTID=$obj_id&oid_type=$type",
+                    qs      => "$pages_qs&OBJECTID=$attr->{OBJECTID}&oid_type=$FORM{oid_type}",
                     ID      => 'OID_LIST',
-                    caption => $SNMP::MIB{$obj_id}{label},
+                    caption => $SNMP::MIB{$attr->{OBJECTID}}{label},
                     MENU =>
-"$lang{ADD}:index=$index$pages_qs&ID=$obj_id&oid_type=$type&add=1:add",
+"$lang{ADD}:index=$index$pages_qs&OBJECTID=$attr->{OBJECTID}&oid_type=$FORM{oid_type}&add=1:add",
                 },
                 MAKE_ROWS     => 1,
                 TOTAL         => 1,
                 OUTPUT2RETURN => 1
             }
         );
-        if ( ( $FORM{add} || $FORM{chg} ) && $type eq 'main' ) {
+        if ( ( $FORM{add} || $FORM{chg} ) && $FORM{oid_type} eq 'main' ) {
             my %labels;
             foreach my $oid ( keys(%SNMP::MIB) ) {
                 if (
@@ -1785,7 +1775,7 @@ sub oids_set {
                     HIDDEN => {
                         'index'    => $index,
                         'oid_type' => 'main',
-                        'ID'       => $obj_id,
+                        'OBJECTID' => $attr->{OBJECTID},
                         'OID_ID'   => $FORM{chg}
                     },
                     class => 'form-horizontal'
@@ -1815,6 +1805,9 @@ sub oids_set {
         else {
             print $table;
         }
+    }
+    elsif ( !$FORM{oid_type} || $FORM{MODULE} ) {
+        nms_modules({ OBJECTID => $attr->{OBJECTID} });
     }
 
     return 1;
@@ -1915,7 +1908,7 @@ sub oid_table_row_edit {
     my $scr = qq(
          <script>
          jQuery(':checkbox').change(function(){
-             var link = '?get_index=oids_set&header=2&oid_type=table&OBJECTID=$attr->{OBJECTID}';
+             var link = '?get_index=nms_sysobjectid&header=2&oid_type=table&OBJECTID=$attr->{OBJECTID}';
              if(jQuery(this).prop('checked')) {
                jQuery.get(link + '&chg=$attr->{OID_ID}' + '&ADD=' + jQuery(this).prop('id'), function(data){
                  //alert(data);
@@ -2019,23 +2012,12 @@ sub nms_client_obj {
                 $dhcp->[0]->{mac}   = $Nms->{ONU_MAC};
             }
         }
-        if ( $FORM{IN_MODAL} ) {
-            cable_test(
-                {
-                    OBJECTID => $nms->[0]->{sysobjectid},
-                    IP       => $nms->[0]->{ip},
-                    PORT     => $dhcp->[0]->{ports}
-                }
-            );
-            return 1;
-        }
         my $table = $html->table(
             {
                 width               => '100%',
                 caption             => "MAC: $dhcp->[0]->{mac}",
                 title_plain         => [ $lang{NAME}, 'IP', $lang{PORT} ],
                 ID                  => "CABLE_TEST",
-                HAS_FUNCTION_FIELDS => 1
             }
         );
         $table->addrow(
@@ -2045,22 +2027,32 @@ sub nms_client_obj {
                 { href => "index.cgi?index=$nms_index&ID=$nms->[0]->{id}" }
             ),
             $nms->[0]->{ip},
-            $dhcp->[0]->{ports},
-            $html->button(
-                'CableTest',
-                undef,
-                {
-                    JAVASCRIPT     => '',
-                    SKIP_HREF      => 1,
-                    NO_LINK_FORMER => 1,
-                    ICON           => 'glyphicon glyphicon-random text-info',
-                    ex_params =>
-qq/onclick=\"loadToModal('index.cgi?qindex=$index$pages_qs&header=2')\"/
-                }
-            )
+            $dhcp->[0]->{ports}
         );
         print $table->show();
-        nms_obj_data( { IID => $dhcp->[0]->{ports}, ID => $nms->[0]->{id} } );
+        my @header_arr = [ $lang{MAIN}, "index.cgi?index=$index&visual=INFO$pages_qs" ];
+        foreach my $item ( sort %utils_menu ) {
+            push @header_arr, [ $utils_menu{$item}{user_menu}, "index.cgi?index=$index&visual=" . $utils_menu{$item}{user_menu} . $pages_qs ] if $utils_menu{$item}{user_menu};
+        }
+        print $html->element(
+            'nav',
+            table_header2( \@header_arr ),
+            {
+                class => 'navbar navbar-default',
+                style => 'margin-bottom: 0px;'
+            }
+        );
+        my $visual = $FORM{visual} || 'INFO';
+        if ( $visual eq 'INFO' ) {
+            nms_obj_data( { IID => $dhcp->[0]->{ports}, ID => $nms->[0]->{id} } );
+        }
+        elsif ( exists $actions{$visual} ) {
+          &{$actions{$visual}{user_act}}({
+                    OBJECTID => $nms->[0]->{sysobjectid},
+                    IP       => $nms->[0]->{ip},
+                    PORT     => $dhcp->[0]->{ports}
+                  });
+        }
     }
     else {
         print $html->message( 'warning', '', "MAC address is not exists" );

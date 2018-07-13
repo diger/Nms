@@ -12,12 +12,22 @@ use Abills::Base qw(ip2int mk_unique_value);
 use Nms::db::Traps;
 use Nms::HTMLelem qw(oid_enums oid_conv);
 
-our ( %lang, $Nms, $html, %conf, $admin, $db );
+our ( %lang, $Nms, $html, %conf, $admin, $db, %utils_menu, %actions );
 
 my $Traps = Traps->new( $db, $admin, \%conf );
 SNMP::addMibDirs('../../var/snmp/mibs');
 SNMP::addMibDirs('../../var/snmp/mibs/private');
 SNMP::initMib();
+
+$utils_menu{NmsTraps} = ({ 
+  obj_menu  => 'TRAPS',
+ });
+$actions{'TRAPS'} = ({
+  obj_act  =>  \&nms_traps
+});
+
+$FUNCTIONS_LIST{"21:1:Traps:nms_trap_types:"} = 5;
+$FUNCTIONS_LIST{"22:0:Traps:nms_traps:"} =  8;
 
 #**********************************************************
 
