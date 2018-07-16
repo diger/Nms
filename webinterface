@@ -851,7 +851,7 @@ sub mibs_browser {
     my ($attr) = @_;
 
     my $root_index = get_function_index('mibs_browser');
-    my $mods_index = get_function_index('nms_modules');
+    my $mods_index = get_function_index('nms_sysobjectid');
     my $ID =
          $attr->{ID}
       || $FORM{ID}
