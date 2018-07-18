@@ -151,7 +151,7 @@ sub nms_obj {
             }
         );
     }
-    if ( $FORM{LABEL} && $FORM{VALUE} ) {
+    if ( $FORM{LABEL} && $FORM{SET} ) {
         nms_snmp_set(
             {
                 ID    => $FORM{ID},
@@ -202,7 +202,7 @@ sub nms_obj {
                         {
                                 href => "index.cgi?index="
                               . $so_index
-                              . "&SYSOBJECTID="
+                              . "&OBJECTID="
                               . $nms->[0]->{sysobjectid}
                         }
                     )
