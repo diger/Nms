@@ -109,7 +109,7 @@ sub nms_traps {
                     "index=" . get_function_index('nms_trap_types'),
                     { class => 'change' }
                 ),
-                qs => ( $FORM{NAS_ID} ) ? "$pages_qs&NAS_ID=$FORM{NAS_ID}"
+                qs => ( $FORM{ID} ) ? "$pages_qs&visual=TRAPS"
                 : $pages_qs,
                 ID         => 'NMS_TRAPS_LIST',
                 DATA_TABLE => ( $attr->{MONIT} )
