@@ -114,21 +114,9 @@ $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $Traps = Traps->new( $db, $Admin, \%conf );
 my $Sender = Abills::Sender::Core->new( $db, $Admin, \%conf );
-my %send_attr = (
-    JID         => $conf{XMPP_ALERT_JID},
-    PASS        => $conf{XMPP_ALERT_JID_PASS},
-    SENDER_TYPE => 'XMPP',
-    TYPE        => 'chat'
-);
 
 #use constant THREADS_COUNT => 4;
-my $bindip = $argv->{IP} || $conf{GETTRAP_IP} || '';
-my $snmptrapd = Net::SNMPTrapd->new(
-    Family    => 'ipv4',
-    LocalAddr => $bindip,
-    LocalPort => 162,
-    timeout   => 3
-) or die "Error creating SNMPTrapd listener: ", Net::SNMPTrapd->error;
+
 my $nms = $Nms->obj_list(
     {
         COLS_NAME => 1,
@@ -158,6 +146,25 @@ my $alerts = $Nms->oids_list(
         LIST2HASH => 'section,label'
     }
 );
+my $new_cfg = $Nms->config_list({
+  PARAM => '_SHOW',
+  VALUE => '_SHOW'
+});
+foreach my $util ( @$new_cfg ) {
+  $conf{$util->[0]} = $util->[1]
+}
+my %send_attr = (
+    JID         => $conf{NMS_GETTRAP_ALERT_USER},
+    PASS        => $conf{NMS_GETTRAP_ALERT_PASS},
+    SENDER_TYPE => 'XMPP',
+    TYPE        => 'chat'
+);
+my $snmptrapd = Net::SNMPTrapd->new(
+    Family    => 'ipv4',
+    LocalAddr => $argv->{IP} || $conf{NMS_GETTRAP_IP} || undef,
+    LocalPort => 162,
+    timeout   => 3
+) or die "Error creating SNMPTrapd listener: ", Net::SNMPTrapd->error;
 
 #for my $i (1..(THREADS_COUNT - 1)) { threads->create(\&request_loop, $obj); }
 #request_loop($obj);
@@ -223,7 +230,7 @@ sub request_loop {
                         $Sender->send_message(
                             {
                                 UID        => 1,
-                                TO_ADDRESS => 'admin@freenet59.ru',
+                                TO_ADDRESS => $conf{NMS_GETTRAP_ALERT_ADDR},
                                 MESSAGE    => "IP"
                                   . $trap->remoteaddr . " "
                                   . $names{ $trap->remoteaddr }[1]
@@ -263,7 +270,7 @@ sub request_loop {
                     $Sender->send_message(
                         {
                             UID        => 1,
-                            TO_ADDRESS => 'admin@freenet59.ru',
+                            TO_ADDRESS => $conf{NMS_GETTRAP_ALERT_ADDR},
                             MESSAGE    => "IP"
                               . $trap->remoteaddr . " "
                               . $names{ $trap->remoteaddr }[1] . ":\n"

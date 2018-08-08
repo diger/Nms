@@ -57,11 +57,18 @@ my $Admin = Admins->new( $db, \%conf );
 
 $Admin->info( $conf{SYSTEM_ADMIN_ID}, { IP => '127.0.0.1' } );
 
-my $Redis = Redis->new( server => $conf{REDIS_SERV}, encoding => undef );
 my $Nms = Nms->new( $db, $Admin, \%conf );
 my $Lldp   = Lldp->new( $db, $Admin, \%conf );
 my $ctime  = time;
 my $status = 0;
+my $new_cfg = $Nms->config_list({
+  PARAM => '_SHOW',
+  VALUE => '_SHOW'
+});
+foreach my $util ( @$new_cfg ) {
+  $conf{$util->[0]} = $util->[1]
+}
+my $Redis = Redis->new( server => $conf{NMS_REDIS_SERV}, encoding => undef );
 
 if ( $argv->{DEBUG} ) {
     $debug = $argv->{DEBUG};

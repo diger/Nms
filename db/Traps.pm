@@ -32,6 +32,11 @@ sub new {
     $self->{db}    = $db;
     $self->{admin} = $admin;
     $self->{conf}  = $CONF;
+    $CONF->{NMS_GETTRAP_IP} = '10.0.0.1';
+    $CONF->{NMS_GETTRAP_ALERT_ADDR} = 'admin@example.com';
+    $CONF->{NMS_GETTRAP_ALERT_USER}= 'nms@example.com';
+    $CONF->{NMS_GETTRAP_ALERT_PASS} = '12345';
+    $CONF->{NMS_GETTRAPS_CLEAN_PERIOD} = 10;
 
     return $self;
 }

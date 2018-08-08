@@ -39,6 +39,21 @@ sub new {
   $self->{db}=$db;
   $self->{admin} = $admin;
   $self->{conf} = $CONF;
+  
+  $CONF->{NMS_NET} = '10.0.0.0/24';
+  $CONF->{NMS_COMMUNITY_RO} = 'public';
+  $CONF->{NMS_COMMUNITY_RW} = 'private';
+  $CONF->{NMS_MAC_NOTIF} = 0;
+  $CONF->{NMS_STATS_CLEAN_PERIOD} = 60;
+  $CONF->{NMS_REDIS_SERV} = '10.0.0.1:6379';
+
+  my $new_cfg = $self->query2("SELECT param, value
+    FROM nms_config;",
+    undef
+  );
+  foreach my $util (@{$new_cfg->{list}}) {
+    $CONF->{$util->[0]} = $util->[1]
+  }
 
   return $self;
 }
@@ -533,6 +548,71 @@ sub trigger_del {
   my ($id) = @_;
 
   $self->query_del('nms_obj_triggers', { ID => $id });
+ 
+  return $self;
+}
+
+#**********************************************************
+=head2 config_list($attr)
+
+=cut
+#**********************************************************
+sub config_list {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $SORT      = ($attr->{SORT})      ? $attr->{SORT}      : 1;
+  $DESC      = ($attr->{DESC})      ? $attr->{DESC}      : '';
+  $PG        = ($attr->{PG})        ? $attr->{PG}        : 0;
+  $PAGE_ROWS = ($attr->{PAGE_ROWS}) ? $attr->{PAGE_ROWS} : 25;
+
+  my $WHERE =  $self->search_former($attr, [
+      ['ID',    'INT', 'id',    1 ],
+			['PARAM', 'STR', 'param', 1 ],
+      ['VALUE', 'STR', 'value', 1 ],
+    ],
+    { WHERE => 1,
+    }
+  );
+
+  $self->query2("SELECT $self->{SEARCH_FIELDS} id
+    FROM nms_config
+    $WHERE
+    ORDER BY $SORT $DESC
+    LIMIT $PG, $PAGE_ROWS;",
+    undef,
+    $attr
+  );
+
+  my $list = $self->{list};
+  
+  return $self->{list_hash} if ($attr->{LIST2HASH});
+
+  return $list;
+}
+
+#**********************************************************
+# config_add()
+#**********************************************************
+sub config_add {
+  my $self = shift;
+  my ($attr) = @_;
+
+  $self->query_add('nms_config', $attr, { REPLACE => 1 });
+
+  return $self;
+}
+
+#**********************************************************
+=head2 config_del($id)
+
+=cut
+#**********************************************************
+sub config_del {
+  my $self = shift;
+  my ($id) = @_;
+
+  $self->query_del('nms_config', { ID => $id });
  
   return $self;
 }

@@ -1,19 +1,19 @@
 use Abills::Base qw(in_array);
 
 our %FUNCTIONS_LIST = (
-    "1:0:NMS:nms_sysobjectid:"              => 5,
-    "2:1:Triggers:nms_triggers_list:"       => 5,
-    "3:1:$lang{REPORTS}:nms_reports_setup:" => 5,
-    "4:0:NMS:nms_monitor:"                  => 6,
-    "5:0:NMS:nms_obj:"                      => 8,
-    "6:0:MIBS browser:mibs_browser:ID"      => 8,
-    "7:0:NMS:nms_client_obj:UID"            => 20,
-    "8:0:NMS:nms_reports:"                  => 4,
-    "12:1:TFTP:tftp_setup:"                 => 5,
+    "1:0:NMS:nms_config:"              => 5,
+    "2:1:SYSOBJECTID:nms_sysobjectid:"       => 5,
+    "3:1:Triggers:nms_triggers_list:"       => 5,
+    "4:1:$lang{REPORTS}:nms_reports_setup:" => 5,
+    "5:0:NMS:nms_monitor:"                  => 6,
+    "6:0:NMS:nms_obj:"                      => 8,
+    "7:0:MIBS browser:mibs_browser:ID"      => 8,
+    "8:0:NMS:nms_client_obj:UID"            => 20,
+    "9:0:NMS:nms_reports:"                  => 4,
 );
 
 load_module("Nms", $html);
 
-%PERIODIC = ( daily => ['nms_traps_clean','nms_stats_clean'] );
+our %PERIODIC = ( daily => ['nms_traps_clean','nms_stats_clean'] );
 
 1

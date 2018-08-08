@@ -32,6 +32,10 @@ sub new {
     $self->{db}    = $db;
     $self->{admin} = $admin;
     $self->{conf}  = $CONF;
+    
+    $CONF->{NMS_LLDP_ROOT} = '10.0.0.1';
+    $CONF->{NMS_LLDP_USEDB} = 1;
+    $CONF->{NMS_LLDP_STP} = 0;
 
     return $self;
 }

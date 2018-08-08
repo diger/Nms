@@ -101,4 +101,11 @@ CREATE TABLE `nms_modules` (
   FOREIGN KEY (`objectid`) REFERENCES `nms_sysobjectid` (`objectid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) COMMENT='Nms snmp modules'
 
+CREATE TABLE `nms_config` (
+  `id` smallint(4) unsigned NOT NULL AUTO_INCREMENT,
+  `param` varchar(50) NOT NULL DEFAULT '',
+  `value` varchar(100) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `param` (`param`)
+) COMMENT='Nms config'
 
