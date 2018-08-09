@@ -106,17 +106,14 @@ sub live_stats {
     );
     print qq(
     <script>
-    var interval = 3000;
-    var link = '?get_index=get_stats&header=2&json=1&PORT=$attr->{PORT}&IP=$attr->{IP}&INT=' + interval/1000;
+    var interval = 5000;
+    var link = '?get_index=get_stats&header=2&json=1&PORT=$attr->{PORT}&IP=$attr->{IP}';
     jQuery(document).ready(function() {
       var chartData = [];
       jQuery.getJSON(link, function(preData) {
-        console.log(preData);
+        //console.log(preData);
         setInterval(function() {
-          console.log(preData);
           jQuery.getJSON(link, function(results) {
-              // Set the already-initialised graph to use this new data
-              //console.log(results);
               for (var item in results) {
                 odds = (results[item] - preData[item]) / (interval / 1000) / 1048576 * 8 ;
                 preData[item] = results[item];
@@ -129,10 +126,13 @@ sub live_stats {
               //  results[x]['y'] = curt + results[x]['y'];
               //  chartData.push(results[x]);
               //}
+              while ( chartData.length > 40 ) {
+                 chartData.shift();
+              }
               chart.setData(chartData);
-              console.log(chartData);
+              //console.log(chartData);
           });
-        }, interval*2);
+        }, interval);
       });
     });
     </script>
