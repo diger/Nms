@@ -23,14 +23,19 @@ $snmpparms{Retries}   = 1;
 $snmpparms{Timeout}   = 2000000;
 $snmpparms{Community} = $conf{NMS_COMMUNITY_RW};
 
-$utils_menu{CableTest} = ({ 
-  cfg_menu  => 'CABLE',
-  user_menu => 'CABLE',
- });
-$actions{'CABLE'} = ({ 
-  cfg_act  =>  \&cable_test_setup,
-  user_act  =>  \&cable_test,
- });
+$utils_menu{CableTest} = (
+    {
+        cfg_menu  => 'CABLE',
+        user_menu => 'CABLE',
+    }
+);
+$actions{'CABLE'} = (
+    {
+        cfg_act  => \&cable_test_setup,
+        user_act => \&cable_test,
+    }
+);
+$FUNCTIONS_LIST{"42:0:Cable:cable_test:PORT5"} = 8;
 
 #**********************************************************
 
@@ -41,15 +46,14 @@ $actions{'CABLE'} = ({
 #**********************************************************
 sub cable_test {
     my ($attr) = @_;
-    my $nms_index = get_function_index('nms_obj');
 
-    load_mibs( { ID => $attr->{OBJECTID} } );
-    if ( pon_test( { UID => $FORM{UID}, IP => $attr->{IP} } ) ) {
+    my $prm = load_mibs( { ID => $attr->{ID} || $FORM{ID} } );
+    if ( $FORM{UID} && pon_test( { UID => $FORM{UID}, IP => $prm->{ip} } ) ) {
         return 1;
     }
     my $test_param = $Nms->oids_list(
         {
-            OBJECTID  => $attr->{OBJECTID},
+            OBJECTID  => $prm->{sysobjectid},
             LABEL     => '_SHOW',
             SECTION   => '_SHOW',
             TYPE      => 'cable',
@@ -62,19 +66,36 @@ sub cable_test {
 
     foreach my $key ( keys %$test_param ) {
         $mib = $key if $test_param->{$key} eq 'action';
-        push @vars, [ $key, $attr->{PORT} ] if $test_param->{$key} ne 'action';
+        push @vars, [ $key, $attr->{PORT} || $FORM{PORT} ]
+          if $test_param->{$key} ne 'action';
         push @{ $pair{ $test_param->{$key} } }, $key;
     }
 
-    my $sess = SNMP::Session->new( DestHost => $attr->{IP}, %snmpparms );
+    my $sess = SNMP::Session->new( DestHost => $prm->{ip}, %snmpparms );
     my $value = $SNMP::MIB{$mib}{enums}{action} || 1;
-    my $vb = SNMP::Varbind->new( [ $mib, $attr->{PORT}, $value ] );
-    $sess->set($vb);
+    if ( !$FORM{header} ) {
+        my $vb = SNMP::Varbind->new( [ $mib, $attr->{PORT}, $value ] );
+        $sess->set($vb);
 
-    if ( $sess->{ErrorNum} ) {
-        return $html->message( 'err', $lang{ERROR}, $sess->{ErrorStr} );
+        if ( $sess->{ErrorNum} ) {
+            return $html->message( 'err', $lang{ERROR}, $sess->{ErrorStr} );
+        }
+        print $html->element(
+            'ul',
+            "<i class='fa fa-spinner fa-spin fa-5x'></i>",
+            { ID => 'CBLT', class => 'list-group' }
+        );
+        print qq(
+           <script>
+           setTimeout(function() {
+             var url = '?get_index=cable_test&header=2&PORT=$attr->{PORT}&ID=$attr->{ID}';
+             jQuery('#CBLT').load(url);
+           }, 3000);
+           </script>
+           );
+        return 1;
     }
-    sleep(2);
+
     my $vl = SNMP::VarList->new(@vars);
     $sess->get($vl);
     if ( $sess->{ErrorNum} ) {
@@ -131,7 +152,8 @@ sub cable_test {
               $html->element( 'li', $span, { class => 'list-group-item' } );
         }
     }
-    print $html->element( 'ul', $li, { class => 'list-group' } );
+    print $li;
+
     return 1;
 }
 
@@ -159,7 +181,7 @@ sub cable_test_setup {
             }
         );
     }
-    
+
     if ( $FORM{ID} ) {
         oid_table_row_edit( { OID_ID => $FORM{ID} } );
     }
@@ -231,12 +253,12 @@ sub cable_test_setup {
         $LIST_PARAMS{TYPE}     = 'cable';
         result_former(
             {
-                INPUT_DATA     => $Nms,
-                FUNCTION       => 'oids_list',
-                DEFAULT_FIELDS => 'LABEL,SECTION',
+                INPUT_DATA      => $Nms,
+                FUNCTION        => 'oids_list',
+                DEFAULT_FIELDS  => 'LABEL,SECTION',
                 FUNCTION_FIELDS => ':change:id;objectid;&oid_type=CABLE,del',
-                HIDDEN_FIELDS => 'ID,OBJECTID',
-                EXT_TITLES    => {
+                HIDDEN_FIELDS   => 'ID,OBJECTID',
+                EXT_TITLES      => {
                     label => "$lang{NAME}",
                     type  => "$lang{TYPE}",
                 },
@@ -269,13 +291,13 @@ sub pon_test {
         "SELECT _onu_mac AS ONU_MAC FROM users_pi WHERE uid='$attr->{UID}';",
         undef, { INFO => 1 } );
     if ( $Nms->{ONU_MAC} ) {
-      $snmpparms{UseSprintValue} = 1;
-      my $sess = SNMP::Session->new( DestHost => $attr->{IP}, %snmpparms );
-      my @result = $sess->bulkwalk( 0, 1, [ 'onuID' ] );
-      if ( $sess->{ErrorNum} ) {
-          return $html->message( 'err', $lang{ERROR}, $sess->{ErrorStr} );
-      }
-      print Dumper @result;
+        $snmpparms{UseSprintValue} = 1;
+        my $sess = SNMP::Session->new( DestHost => $attr->{IP}, %snmpparms );
+        my @result = $sess->bulkwalk( 0, 1, ['onuID'] );
+        if ( $sess->{ErrorNum} ) {
+            return $html->message( 'err', $lang{ERROR}, $sess->{ErrorStr} );
+        }
+        print Dumper @result;
     }
     return $Nms->{ONU_MAC};
 }

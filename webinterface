@@ -138,7 +138,7 @@ sub nms_obj {
         { LABEL => '_SHOW', LIST2HASH => 'objectid,label' } );
     my $so_index = get_function_index('nms_sysobjectid');
 
-    if ( $FORM{OID} || ($FORM{chg} && $FORM{header}) ) {
+    if ( $FORM{OID} || ( $FORM{chg} && $FORM{header} ) ) {
         return oids_set(
             {
                 OBJECTID => $FORM{ID},
@@ -1581,8 +1581,9 @@ sub nms_monitor {
         $page = $olist->[0];
     }
     foreach my $item ( sort keys %actions ) {
-        if ($actions{$item}{monit_act}) {
-          $page .= &{ $actions{$item}{monit_act} }( { PAGE_ROWS => 10, MONIT => 1 } );
+        if ( $actions{$item}{monit_act} ) {
+            $page .= &{ $actions{$item}{monit_act} }
+              ( { PAGE_ROWS => 10, MONIT => 1 } );
         }
     }
 
@@ -2086,7 +2087,8 @@ sub nms_client_obj {
                 {
                     OBJECTID => $nms->[0]->{sysobjectid},
                     IP       => $nms->[0]->{ip},
-                    PORT     => $dhcp->[0]->{ports}
+                    PORT     => $dhcp->[0]->{ports},
+                    ID       => $nms->[0]->{id}
                 }
             );
         }

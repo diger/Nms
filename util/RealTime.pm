@@ -53,14 +53,13 @@ sub get_stats {
     );
 
     $sess->get($vb);
-    
+
     my %result;
-    
+
     foreach my $val (@$vb) {
-          #  $val->[0] => sprintf( "%.2f",($val->[2] - $prev_result{$val->[0]}) / ($attr->{INT} || $FORM{INT} || 2) / 1048576 * 8),
-      $result{$val->[0]} = $val->[2]
+        $result{ $val->[0] } = $val->[2];
     }
-    
+
     $html->{JSON_OUTPUT} = JSON->new->indent->encode( \%result );
     print $html->{JSON_OUTPUT} if $FORM{json};
 
@@ -87,7 +86,7 @@ sub live_stats {
     my $ctime = time;
     my @params;
     foreach my $key (@$curr) {
-      push @params, $key->[0];
+        push @params, $key->[0];
     }
 
     print $html->make_charts3(
@@ -122,10 +121,6 @@ sub live_stats {
                   'y': Date.now()
                 });
               };
-            //  for (x in results) {
-              //  results[x]['y'] = curt + results[x]['y'];
-              //  chartData.push(results[x]);
-              //}
               while ( chartData.length > 40 ) {
                  chartData.shift();
               }
